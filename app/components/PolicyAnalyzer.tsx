@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Clock, CheckCircle, AlertCircle, FileText } from 'lucide-react';
-import { AnalysisResults, ComparisonResult } from '@/lib/types';
-import SystemStatusIndicator from './SystemStatusIndicator';
+import { Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { AnalysisResults } from '@/lib/types';
 
 interface ProgressData {
   stage: string;
@@ -13,10 +12,12 @@ interface ProgressData {
   error?: string;
 }
 
-export default function PolicyAnalyzer() {
-  const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+interface PolicyAnalyzerProps {
+  sessionId?: string | null;
+  onAnalysisComplete?: (results: AnalysisResults) => void;
+}
+
+export default function PolicyAnalyzer({ sessionId, onAnalysisComplete }: PolicyAnalyzerProps) {
   const [progress, setProgress] = useState<ProgressData | null>(null);
   const [results, setResults] = useState<AnalysisResults | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +46,10 @@ export default function PolicyAnalyzer() {
             
           case 'results':
             setResults(data.results);
-            setProgress(null); // Clear progress once results are loaded
+            setProgress(null);
+            if (onAnalysisComplete) {
+              onAnalysisComplete(data.results);
+            }
             eventSource.close();
             break;
             
@@ -65,69 +69,11 @@ export default function PolicyAnalyzer() {
       eventSource.close();
     };
 
-    // Cleanup function
     return () => {
       console.log('Closing SSE connection');
       eventSource.close();
     };
-  }, [sessionId, results]);
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (selectedFile) {
-      if (selectedFile.type !== 'application/pdf') {
-        setError('Please select a PDF file');
-        return;
-      }
-      if (selectedFile.size > 10 * 1024 * 1024) {
-        setError('File size must be under 10MB');
-        return;
-      }
-      setFile(selectedFile);
-      setError(null);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!file) return;
-
-    setIsUploading(true);
-    setError(null);
-    setSessionId(null);
-    setProgress(null);
-    setResults(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('policy', file);
-
-      const response = await fetch('/api/policies/analyze', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
-
-      const data = await response.json();
-      setSessionId(data.sessionId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const resetAnalysis = () => {
-    setFile(null);
-    setSessionId(null);
-    setProgress(null);
-    setResults(null);
-    setError(null);
-    setIsUploading(false);
-  };
+  }, [sessionId, results, onAnalysisComplete]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -142,67 +88,13 @@ export default function PolicyAnalyzer() {
     }).format(amount);
   };
 
+  // Don't render anything if there's no sessionId
+  if (!sessionId) {
+    return null;
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Policy Analysis Tool
-        </h1>
-        <p className="text-gray-600">
-          Upload your health insurance policy to compare with Australian providers
-        </p>
-      </div>
-
-      {/* System Status Indicator */}
-      <SystemStatusIndicator />
-
-      {/* File Upload Section */}
-      {!sessionId && (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
-          <div className="text-center">
-            <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <div className="mb-4">
-              <label htmlFor="file-upload" className="cursor-pointer">
-                <span className="text-lg font-medium text-blue-600 hover:text-blue-500">
-                  Choose your policy PDF
-                </span>
-                <input
-                  id="file-upload"
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </label>
-            </div>
-            {file && (
-              <div className="mb-4">
-                <p className="text-sm text-gray-600">
-                  Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)
-                </p>
-              </div>
-            )}
-            <button
-              onClick={handleUpload}
-              disabled={!file || isUploading}
-              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isUploading ? (
-                <>
-                  <Clock className="animate-spin -ml-1 mr-3 h-5 w-5" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="-ml-1 mr-3 h-5 w-5" />
-                  Start Analysis
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Error Display */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-md p-4">
@@ -259,21 +151,12 @@ export default function PolicyAnalyzer() {
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Analysis Results</h2>
-            <button
-              onClick={resetAnalysis}
-              className="text-sm text-blue-600 hover:text-blue-500"
-            >
-              Analyze Another Policy
-            </button>
           </div>
 
           {/* Metadata */}
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
             <h3 className="text-lg font-medium text-gray-900 mb-2">Policy Information</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="font-medium">File:</span> {file?.name || 'Unknown'}
-              </div>
               <div>
                 <span className="font-medium">Processing Time:</span> {formatTime(results.processingTimeMs)}
               </div>

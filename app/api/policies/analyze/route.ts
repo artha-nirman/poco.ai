@@ -3,36 +3,61 @@ import { CorePolicyProcessor } from '@/lib/services/policy-processor';
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get('policy') as File;
+    const contentType = request.headers.get('content-type');
+    let sessionId: string;
+    let contentToProcess: Buffer;
     
-    if (!file) {
-      return NextResponse.json(
-        { error: 'No policy file provided' },
-        { status: 400 }
-      );
-    }
+    if (contentType?.includes('application/json')) {
+      // Handle JSON request from privacy protection system
+      const body = await request.json();
+      
+      if (!body.anonymizedContent && !body.originalContent) {
+        return NextResponse.json(
+          { error: 'No content provided for analysis' },
+          { status: 400 }
+        );
+      }
 
-    // Validate file type and size
-    if (file.type !== 'application/pdf') {
-      return NextResponse.json(
-        { error: 'Only PDF files are allowed' },
-        { status: 400 }
-      );
-    }
+      // Use existing session ID if provided, or generate new one
+      sessionId = body.sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Use anonymized content for analysis (privacy-safe)
+      const textContent = body.anonymizedContent || body.originalContent;
+      contentToProcess = Buffer.from(textContent, 'utf-8');
+      
+    } else {
+      // Handle FormData request (direct file upload - legacy)
+      const formData = await request.formData();
+      const file = formData.get('policy') as File;
+      
+      if (!file) {
+        return NextResponse.json(
+          { error: 'No policy file provided' },
+          { status: 400 }
+        );
+      }
 
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
-      return NextResponse.json(
-        { error: 'File size exceeds 10MB limit' },
-        { status: 400 }
-      );
-    }
+      // Validate file type and size
+      if (file.type !== 'application/pdf') {
+        return NextResponse.json(
+          { error: 'Only PDF files are allowed' },
+          { status: 400 }
+        );
+      }
 
-    // Generate session ID
-    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Convert file to buffer
-    const buffer = Buffer.from(await file.arrayBuffer());
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        return NextResponse.json(
+          { error: 'File size exceeds 10MB limit' },
+          { status: 400 }
+        );
+      }
+
+      // Generate session ID
+      sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Convert file to buffer
+      contentToProcess = Buffer.from(await file.arrayBuffer());
+    }
     
     // Initialize policy processor (singleton)
     const processor = CorePolicyProcessor.getInstance();
@@ -45,7 +70,7 @@ export async function POST(request: NextRequest) {
     
     // In a real implementation, we'd process this in the background
     // For now, we'll start processing and return the session ID immediately
-    processor.processPolicy(sessionId, buffer).catch((error: any) => {
+    processor.processPolicy(sessionId, contentToProcess).catch((error: any) => {
       console.error(`Processing failed for session ${sessionId}:`, error);
     });
 
