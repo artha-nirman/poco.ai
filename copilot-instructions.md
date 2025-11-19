@@ -63,6 +63,12 @@ For any architectural changes, new features, or significant technical decisions:
 - **Avoid Redundancy**: Check for existing files covering similar topics
 - **Update vs Create**: When invalidating previous decisions, update existing docs
 
+**CRITICAL REMINDER**: Before ANY file creation or modification:
+1. Re-read these instructions completely
+2. Check if existing files can be updated instead
+3. Get explicit approval for new files
+4. Keep instructions generic and reusable
+
 ---
 
 ## Performance Guidelines
@@ -73,7 +79,7 @@ For any architectural changes, new features, or significant technical decisions:
 - **Cold Starts**: Design for acceptable startup times
 
 ### Caching Strategy
-- **Session Data**: Use Vercel KV for temporary data
+- **Session Data**: Use appropriate caching for temporary data
 - **Processed Results**: Cache expensive computations
 - **Provider Data**: Cache static policy information
 
