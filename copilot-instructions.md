@@ -18,7 +18,7 @@ This is an AI system for Australian health insurance comparison. Before making a
 Before any implementation, review relevant project docs:
 - **Requirements/Scope**: Check PRD first
 - **Architecture/Stack**: Check technical-architecture.md
-- **Database Changes**: Check schemas.sql + evolution-strategy.md
+- **Database**: Schema/strategy → `/docs/database/schemas.sql` + `/docs/database/architecture-strategy.md`
 - **Security/PII**: Check pii-protection-architecture.md
 - **Service Integration**: Check service-abstractions.md
 

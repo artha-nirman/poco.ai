@@ -1,4 +1,4 @@
-# Database Implementation Decision Record
+# Database Architecture & Implementation Strategy
 
 **Decision Date**: November 19, 2025  
 **Status**: ✅ **APPROVED & FINAL**  
@@ -165,6 +165,51 @@ ALTER TABLE provider_policies ADD COLUMN content_embedding VECTOR(384);
 - **Final Approval**: ✅ **APPROVED FOR IMPLEMENTATION**
 
 ---
+
+---
+
+## 🔄 **FUTURE EVOLUTION PRINCIPLES**
+
+Even with our enterprise-first approach, we design for future changes using evolution-friendly patterns:
+
+### **1. JSONB for Flexibility**
+```sql
+-- Flexible schema that can evolve without migrations
+CREATE TABLE user_sessions (
+  id UUID PRIMARY KEY,
+  session_data JSONB,            -- Can add any field later
+  metadata JSONB,                -- Extensible metadata
+  created_at TIMESTAMPTZ
+);
+
+-- Add new fields without schema changes
+UPDATE user_sessions 
+SET session_data = session_data || '{"new_feature": true}'::jsonb;
+```
+
+### **2. Additive-Only Changes**
+```sql
+-- Always add, never remove (for backward compatibility)
+ALTER TABLE provider_policies ADD COLUMN embedding_v2 VECTOR(512);
+ALTER TABLE user_sessions ADD COLUMN compliance_flags JSONB;
+
+-- Avoid breaking changes
+-- ALTER TABLE sessions DROP COLUMN old_field; ❌
+-- ALTER TABLE sessions ALTER COLUMN data TYPE TEXT; ❌
+```
+
+### **3. Zero-Downtime Migration Strategy**
+```sql
+-- PATTERN: Expand-Contract-Cleanup for future changes
+
+-- STEP 1: EXPAND (Add new column, keep old)
+ALTER TABLE sessions ADD COLUMN new_structure JSONB;
+
+-- STEP 2: DUAL WRITE (Write to both during transition)
+-- STEP 3: MIGRATE DATA (Background job)
+-- STEP 4: SWITCH READS (New code uses new structure)
+-- STEP 5: CONTRACT (Remove old after verification)
+```
 
 **Next Step**: Begin Phase 1 implementation with core tables and Supabase setup.
 

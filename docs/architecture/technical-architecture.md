@@ -92,7 +92,7 @@
 ## Related Documents
 - **Service Interfaces**: `/docs/architecture/service-abstractions.md`
 - **Database Schema**: `/docs/database/schemas.sql`
-- **Database Strategy**: `/docs/database/evolution-strategy.md`
+- **Database Strategy**: `/docs/database/architecture-strategy.md`
 - **Security Architecture**: `/docs/security/pii-protection-architecture.md`
 - **Platform Analysis**: `/docs/architecture/vercel-platform-analysis.md`
 - **Business Requirements**: `/docs/business/PRD-poco-mvp.md`

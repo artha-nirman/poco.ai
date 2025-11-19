@@ -13,8 +13,7 @@
 │   └── vercel-platform-analysis.md    # Platform feasibility
 ├── database/                          # Data architecture
 │   ├── schemas.sql                    # Database schemas (MVP + Enterprise)
-│   ├── implementation-decision.md     # Final database approach decision
-│   ├── evolution-strategy.md          # Migration strategy
+│   ├── architecture-strategy.md       # Database architecture & implementation strategy
 │   └── confidence-assessment.md       # Implementation confidence
 └── security/                          # Security & compliance
     └── pii-protection-architecture.md # PII protection design
@@ -27,7 +26,7 @@
 |------|----------|
 | **Business requirements** | `business/PRD-poco-mvp.md` |
 | **Tech stack & architecture** | `architecture/technical-architecture.md` |
-| **Database design** | `database/schemas.sql` + `database/implementation-decision.md` |
+| **Database design** | `database/schemas.sql` + `database/architecture-strategy.md` |
 | **Security compliance** | `security/pii-protection-architecture.md` |
 | **Development guidelines** | `/copilot-instructions.md` |
 
