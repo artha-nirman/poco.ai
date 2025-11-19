@@ -14,6 +14,19 @@ This is an AI system for Australian health insurance comparison. Before making a
 
 ## Development Protocol
 
+### **CRITICAL Terminal Management Rule**
+⚠️ **NEVER run Docker commands in the same terminal as `npm run dev`**
+- Docker commands (`docker-compose down`, `docker-compose up`) interrupt/stop npm server
+- **Always use separate terminals:**
+  - Terminal 1: Docker operations, file edits, testing
+  - Terminal 2: `npm run dev` (keep running continuously)
+
+### **Database Setup Workflow**
+1. **Terminal 1**: `docker-compose down -v && docker-compose up -d`
+2. Wait 5-10 seconds for database initialization
+3. **Terminal 2**: `npm run dev` 
+4. **Never** run Docker commands while npm is running
+
 ### **STEP 1: Document Consultation**
 Before any implementation, review relevant project docs:
 - **Requirements/Scope**: Check PRD first

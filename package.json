@@ -1,0 +1,74 @@
+{
+  "name": "poco",
+  "version": "1.0.0",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "type-check": "tsc --noEmit",
+    "init-db": "tsx lib/database/init-db.ts",
+    "setup-db": "tsx lib/database/setup-db.ts",
+    "db:start": "docker-compose up -d postgres",
+    "db:stop": "docker-compose down",
+    "db:reset": "docker-compose down -v && docker-compose up -d postgres && npm run init-db",
+    "db:admin": "docker-compose --profile tools up pgadmin"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/artha-nirman/poco.ai.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/artha-nirman/poco.ai/issues"
+  },
+  "homepage": "https://github.com/artha-nirman/poco.ai#readme",
+  "description": "",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
+    "@azure/ai-form-recognizer": "^5.1.0",
+    "@google-cloud/documentai": "^9.5.0",
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.83.0",
+    "@tailwindcss/postcss": "^4.1.17",
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.15.6",
+    "@types/react": "^19.2.6",
+    "@types/react-dom": "^19.2.3",
+    "@vercel/blob": "^2.0.0",
+    "@vercel/kv": "^3.0.0",
+    "autoprefixer": "^10.4.22",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.2.3",
+    "drizzle-kit": "^0.31.7",
+    "drizzle-orm": "^0.44.7",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.0.3",
+    "lucide-react": "^0.554.0",
+    "next": "^15.0.3",
+    "pg": "^8.16.3",
+    "postcss": "^8.5.6",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-email": "^5.0.4",
+    "resend": "^6.5.0",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.11",
+    "ts-jest": "^29.4.5",
+    "tsx": "^4.20.6"
+  }
+}

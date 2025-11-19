@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: poco-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: localadmin
+      POSTGRES_PASSWORD: localpassword
+      POSTGRES_DB: poco_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docs/database/schemas.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U localadmin -d poco_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  pgdata:
