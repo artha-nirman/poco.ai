@@ -39,9 +39,10 @@ interface DocumentProcessingResult {
 
 interface PrivacyProtectionProps {
   onDocumentProcessed?: (sessionId: string) => void;
+  onAnalysisStart?: (sessionId: string) => void;
 }
 
-export default function PrivacyProtectionComponent({ onDocumentProcessed }: PrivacyProtectionProps) {
+export default function PrivacyProtectionComponent({ onDocumentProcessed, onAnalysisStart }: PrivacyProtectionProps) {
   const [privacyState, setPrivacyState] = useState<PrivacyState>({
     sessionId: null,
     encryptionKey: null,
@@ -72,88 +73,128 @@ export default function PrivacyProtectionComponent({ onDocumentProcessed }: Priv
     setPrivacyState(prev => ({ ...prev, processing: true }));
     
     try {
-      // For now, let's use a simple text extraction for demonstration
-      // In a real implementation, this would use Azure Document Intelligence
-      let textContent = '';
-      
-      if (selectedFile.type === 'text/plain') {
-        textContent = await selectedFile.text();
-      } else {
-        // For PDFs and other files, we'll use a placeholder
-        textContent = `Document uploaded: ${selectedFile.name} (${selectedFile.type})
+      // Check if file is a binary format that needs Document AI processing
+      const binaryFormats = [
+        'application/pdf',
+        'image/png',
+        'image/jpeg', 
+        'image/jpg',
+        'image/gif',
+        'image/bmp',
+        'image/tiff',
+        'image/webp'
+      ];
+
+      if (binaryFormats.includes(selectedFile.type)) {
+        // For binary files (PDFs, images), send directly to analyze endpoint
+        // This will use Document AI first, then apply privacy protection
+        console.log('📄 Processing binary file directly with Document AI...');
         
-This is a sample insurance policy document for demonstration purposes.
-Policy Holder: John Smith
-Phone: 0412 345 678
-Email: john.smith@email.com
-Premium: $450 per month
-Policy Number: POL123456
-`;
-      }
-
-      // Step 1: PII Protection
-      const privacyResponse = await fetch('/api/privacy', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: textContent,
-          consent: privacyState.consent
-        })
-      });
-
-      if (!privacyResponse.ok) {
-        throw new Error('Document processing failed');
-      }
-
-      const privacyResult: DocumentProcessingResult = await privacyResponse.json();
-      
-      setProcessingResult(privacyResult);
-      setPrivacyNotice(privacyResult.privacyNotice);
-      setPrivacyState(prev => ({
-        ...prev,
-        sessionId: privacyResult.sessionId,
-        encryptionKey: privacyResult.encryptionKey || null,
-        piiDetected: privacyResult.piiDetected,
-        processing: false
-      }));
-
-      // Step 2: Load privacy report if PII was detected
-      if (privacyResult.piiDetected && privacyResult.encryptionKey) {
-        await loadPrivacyReport(privacyResult.sessionId, privacyResult.encryptionKey);
-      }
-
-      // Step 3: Trigger policy analysis with anonymized content
-      if (privacyResult.safeForProcessing) {
+        const formData = new FormData();
+        formData.append('policy', selectedFile);
+        
         const analysisResponse = await fetch('/api/policies/analyze', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!analysisResponse.ok) {
+          throw new Error('Document analysis failed');
+        }
+
+        const analysisResult = await analysisResponse.json();
+        
+        // Redirect to policy analysis with the session ID
+        console.log('📊 Analysis started, session:', analysisResult.sessionId);
+        
+        // Notify parent component that processing has started
+        console.log('🚀 About to call onDocumentProcessed with sessionId:', analysisResult.sessionId);
+        if (onDocumentProcessed) {
+          console.log('✅ Calling onDocumentProcessed callback');
+          onDocumentProcessed(analysisResult.sessionId);
+        } else if (onAnalysisStart) {
+          console.log('✅ Calling onAnalysisStart callback');
+          onAnalysisStart(analysisResult.sessionId);
+        } else {
+          console.warn('⚠️ No callback provided to PrivacyProtection component');
+        }
+        
+      } else {
+        // For text files, use the existing privacy-first flow
+        console.log('📝 Processing text file with privacy protection first...');
+        
+        let textContent = '';
+        if (selectedFile.type === 'text/plain') {
+          textContent = await selectedFile.text();
+        } else {
+          // For unsupported files, show helpful error
+          throw new Error(`Unsupported file type: ${selectedFile.type}. Please upload PDF, image, or text files.`);
+        }
+
+        // Step 1: PII Protection for text content
+        const privacyResponse = await fetch('/api/privacy', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            sessionId: privacyResult.sessionId,
-            anonymizedContent: privacyResult.anonymizedContent,
-            originalContent: textContent
+            content: textContent,
+            consent: privacyState.consent
           })
         });
 
-        if (analysisResponse.ok) {
-          const analysisData = await analysisResponse.json();
-          
-          // Notify parent component that analysis has started
-          if (onDocumentProcessed) {
-            onDocumentProcessed(analysisData.sessionId || privacyResult.sessionId);
+        if (!privacyResponse.ok) {
+          throw new Error('Document processing failed');
+        }
+
+        const privacyResult: DocumentProcessingResult = await privacyResponse.json();
+        
+        setProcessingResult(privacyResult);
+        setPrivacyNotice(privacyResult.privacyNotice);
+        setPrivacyState(prev => ({
+          ...prev,
+          sessionId: privacyResult.sessionId,
+          encryptionKey: privacyResult.encryptionKey || null,
+          piiDetected: privacyResult.piiDetected,
+          processing: false
+        }));
+
+        // Step 2: Load privacy report if PII was detected
+        if (privacyResult.piiDetected && privacyResult.encryptionKey) {
+          await loadPrivacyReport(privacyResult.sessionId, privacyResult.encryptionKey);
+        }
+
+        // Step 3: Trigger policy analysis with anonymized content
+        if (privacyResult.safeForProcessing) {
+          const analysisResponse = await fetch('/api/policies/analyze', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              sessionId: privacyResult.sessionId,
+              anonymizedContent: privacyResult.anonymizedContent,
+              originalContent: textContent
+            })
+          });
+
+          if (analysisResponse.ok) {
+            const analysisData = await analysisResponse.json();
+            
+            // Notify parent component that analysis has started
+            if (onDocumentProcessed) {
+              onDocumentProcessed(analysisData.sessionId || privacyResult.sessionId);
+            }
+          } else {
+            console.warn('Policy analysis failed to start, but PII protection succeeded');
+            if (onDocumentProcessed) {
+              onDocumentProcessed(privacyResult.sessionId);
+            }
           }
         } else {
-          console.warn('Policy analysis failed to start, but PII protection succeeded');
           if (onDocumentProcessed) {
             onDocumentProcessed(privacyResult.sessionId);
           }
-        }
-      } else {
-        if (onDocumentProcessed) {
-          onDocumentProcessed(privacyResult.sessionId);
         }
       }
 

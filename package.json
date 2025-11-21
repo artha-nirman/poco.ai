@@ -36,7 +36,6 @@
     "@anthropic-ai/sdk": "^0.70.0",
     "@azure/ai-form-recognizer": "^5.1.0",
     "@google-cloud/documentai": "^9.5.0",
-    "@google-cloud/vertexai": "^1.10.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.83.0",
     "@tailwindcss/postcss": "^4.1.17",

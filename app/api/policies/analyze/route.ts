@@ -7,9 +7,12 @@ export async function POST(request: NextRequest) {
     const contentType = request.headers.get('content-type');
     let sessionId: string;
     let contentToProcess: Buffer;
+    let fileName: string;
+    let isDirectFileUpload = false;
     
     if (contentType?.includes('application/json')) {
       // Handle JSON request from privacy protection system
+      // This is for already-processed text content that went through privacy protection
       const body = await request.json();
       
       if (!body.anonymizedContent && !body.originalContent) {
@@ -25,12 +28,14 @@ export async function POST(request: NextRequest) {
       // Use existing session ID if provided, or generate new one
       sessionId = body.sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Use anonymized content for analysis (privacy-safe)
+      // This is text content that should be processed as text (not through Document AI)
       const textContent = body.anonymizedContent || body.originalContent;
       contentToProcess = Buffer.from(textContent, 'utf-8');
+      fileName = 'anonymized_document.txt';
       
     } else {
-      // Handle FormData request (direct file upload - legacy)
+      // Handle FormData request (direct file upload)
+      // This is for binary files (PDFs) that need Document AI processing first
       const formData = await request.formData();
       const file = formData.get('policy') as File;
       
@@ -44,12 +49,23 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Validate file type and size
-      if (file.type !== 'application/pdf') {
+      // Allow PDF and supported image formats for Document AI
+      const supportedTypes = [
+        'application/pdf',
+        'image/png', 
+        'image/jpeg',
+        'image/jpg',
+        'image/gif',
+        'image/bmp',
+        'image/tiff',
+        'image/webp'
+      ];
+
+      if (!supportedTypes.includes(file.type)) {
         return NextResponse.json(
           { 
             error: API_ERRORS.INVALID_FILE_TYPE,
-            message: ERROR_MESSAGES[API_ERRORS.INVALID_FILE_TYPE]
+            message: `Invalid file type. Please upload: ${supportedTypes.join(', ')}`
           },
           { status: 400 }
         );
@@ -68,8 +84,12 @@ export async function POST(request: NextRequest) {
       // Generate session ID
       sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Convert file to buffer
+      // Convert file to buffer - preserve binary data for Document AI
       contentToProcess = Buffer.from(await file.arrayBuffer());
+      
+      // Store filename for proper file type detection
+      fileName = file.name;
+      isDirectFileUpload = true;
     }
     
     // Initialize policy processor (singleton)
@@ -83,7 +103,12 @@ export async function POST(request: NextRequest) {
     
     // In a real implementation, we'd process this in the background
     // For now, we'll start processing and return the session ID immediately
-    processor.processPolicy(sessionId, contentToProcess).catch((error: any) => {
+    processor.processPolicy(
+      sessionId, 
+      contentToProcess, 
+      fileName, 
+      !isDirectFileUpload // Skip Document AI for JSON/text content
+    ).catch((error: any) => {
       console.error(`Processing failed for session ${sessionId}:`, error);
     });
 

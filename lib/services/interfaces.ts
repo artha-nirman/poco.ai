@@ -13,17 +13,49 @@ import {
 
 // Document Processing Service Interface
 export interface DocumentProcessor {
-  processDocument(buffer: Buffer): Promise<{
-    text: string;
-    tables: any[];
-    layout: any;
-    confidence: number;
-  }>;
+  processDocument(buffer: Buffer, filename?: string): Promise<StructuredDocumentData>;
+}
+
+// Enhanced interfaces for Google Document AI
+export interface StructuredDocumentData {
+  text: string;
+  tables: TableData[];
+  entities: ExtractedEntity[];
+  layout: DocumentLayout;
+  confidence: number;
+  processingTime: number;
+}
+
+export interface TableData {
+  headers: string[];
+  rows: string[][];
+  confidence: number;
+  pageNumber: number;
+}
+
+export interface ExtractedEntity {
+  type: string;
+  value: string;
+  confidence: number;
+  boundingBox: {
+    vertices: { x: number; y: number }[];
+  };
+}
+
+export interface DocumentLayout {
+  pages: {
+    pageNumber: number;
+    textBlocks: {
+      text: string;
+      confidence: number;
+      boundingBox: any;
+    }[];
+  }[];
 }
 
 // LLM Analysis Service Interface  
 export interface LLMProvider {
-  analyzeFeatures(content: string): Promise<PolicyFeatures>;
+  analyzeFeatures(content: string | StructuredDocumentData): Promise<PolicyFeatures>;
   generateEmbedding(content: string): Promise<number[]>;
   explainRecommendation(comparison: ComparisonResult): Promise<string[]>;
 }

@@ -61,6 +61,61 @@ export const AI_PROMPTS = {
     Process this insurance policy content for semantic similarity matching.
     Focus on extracting key coverage concepts, benefit types, and policy characteristics
     that would be useful for finding similar policies.
+  `,
+
+  GEMINI_JSON_ANALYSIS: `
+    You are an expert Australian health insurance analyst. Analyze this insurance policy document and extract structured information.
+
+    CRITICAL: You MUST return valid JSON only. No markdown, no explanations, just pure JSON.
+
+    Extract and return ONLY this JSON structure:
+
+    {
+      "policyType": "hospital" | "extras" | "combined",
+      "policyTier": "basic" | "bronze" | "silver" | "gold",
+      "premiumCategory": "under-200" | "200-400" | "400-600" | "over-600",
+      "excessCategory": "none" | "under-500" | "500-1000" | "over-1000",
+      "hospitalFeatures": [
+        // Array of strings like "private_hospital", "choice_of_doctor", "emergency_ambulance"
+      ],
+      "extrasFeatures": [
+        // Array of strings like "general_dental", "optical", "physiotherapy", "psychology"
+      ],
+      "waitingPeriods": {
+        // Object with key-value pairs like "hospital_services": "12 months"
+      },
+      "exclusions": [
+        // Array of strings like "cosmetic_surgery", "experimental_treatments"
+      ],
+      "conditions": [
+        // Array of strings like "excess_applies", "annual_limits", "session_limits"
+      ]
+    }
+
+    INSTRUCTIONS:
+    1. For premiumCategory: Look for premium amounts and categorize by monthly cost
+    2. For excessCategory: Find excess/deductible amounts mentioned in the document
+    3. For hospitalFeatures: Include things like private hospital, choice of doctor, ambulance, surgery, accommodation
+    4. For extrasFeatures: Include dental, optical, physio, psychology, massage, etc.
+    5. For waitingPeriods: Extract all waiting periods mentioned (hospital, extras, pre-existing)
+    6. For exclusions: List what's specifically excluded from coverage
+    7. For conditions: Note important terms, limits, or requirements
+
+    Return ONLY the JSON object, no other text.
+  `,
+
+  GEMINI_RECOMMENDATION_EXPLANATION: `
+    You are an Australian health insurance expert. Explain why this policy recommendation makes sense for the user.
+
+    Provide 3-5 clear, specific reasons why this policy is recommended. Focus on:
+    1. Coverage benefits
+    2. Cost value
+    3. Specific advantages
+    4. Any trade-offs to consider
+
+    Return as a JSON array of strings. Each reason should be 1-2 sentences and easy to understand.
+
+    Example: ["Better dental coverage with $1,500 annual limit vs current $800", "20% lower premium while maintaining similar hospital benefits"]
   `
 } as const;
 

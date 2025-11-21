@@ -10,7 +10,9 @@ export default function Home() {
   const [analysisSessionId, setAnalysisSessionId] = useState<string | null>(null);
 
   const handleDocumentProcessed = (sessionId: string) => {
+    console.log('🔄 Document processed callback received with sessionId:', sessionId);
     setAnalysisSessionId(sessionId);
+    console.log('✅ Analysis session ID set to:', sessionId);
   };
 
   return (

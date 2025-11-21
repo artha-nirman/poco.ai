@@ -18,7 +18,7 @@ import {
 import { PROCESSING_MESSAGES, EMAIL_MESSAGES, PRIVACY_CONFIG } from '@/lib/constants';
 
 export class MockDocumentProcessor implements DocumentProcessor {
-  async processDocument(buffer: Buffer) {
+  async processDocument(buffer: Buffer, filename?: string) {
     // Simulate processing time
     await new Promise(resolve => setTimeout(resolve, 1500));
     
@@ -59,9 +59,53 @@ export class MockDocumentProcessor implements DocumentProcessor {
         - Experimental treatments
         - Overseas treatment
       `,
-      tables: [],
-      layout: {},
-      confidence: 0.94
+      tables: [
+        {
+          headers: ['Coverage Type', 'Single', 'Couple', 'Family'],
+          rows: [
+            ['Hospital Premium', '$45/month', '$90/month', '$135/month'],
+            ['Extras Premium', '$25/month', '$50/month', '$75/month'],
+            ['Total Premium', '$70/month', '$140/month', '$210/month']
+          ],
+          confidence: 0.95,
+          pageNumber: 1
+        }
+      ],
+      entities: [
+        {
+          type: 'premium_amount',
+          value: '$70',
+          confidence: 0.92,
+          boundingBox: { vertices: [{ x: 100, y: 200 }, { x: 130, y: 200 }, { x: 130, y: 220 }, { x: 100, y: 220 }] }
+        },
+        {
+          type: 'policy_number',
+          value: 'POL123456',
+          confidence: 0.98,
+          boundingBox: { vertices: [{ x: 150, y: 100 }, { x: 220, y: 100 }, { x: 220, y: 120 }, { x: 150, y: 120 }] }
+        }
+      ],
+      layout: {
+        pages: [
+          {
+            pageNumber: 1,
+            textBlocks: [
+              {
+                text: 'HEALTH INSURANCE POLICY',
+                confidence: 0.99,
+                boundingBox: {}
+              },
+              {
+                text: 'Policy Details Section',
+                confidence: 0.95,
+                boundingBox: {}
+              }
+            ]
+          }
+        ]
+      },
+      confidence: 0.94,
+      processingTime: 1500
     };
   }
 }
@@ -354,27 +398,45 @@ export class MockEmailService implements EmailService {
 // Service factory for easy switching between mock and real services
 export class ServiceFactory {
   static createDocumentProcessor(): DocumentProcessor {
-    // Default to mock services in development
-    const useMock = process.env.MOCK_AI_SERVICES !== 'false';
+    // Use real Google Document AI if credentials are configured
+    const useGoogle = process.env.GOOGLE_CLOUD_PROJECT_ID && 
+                     process.env.GOOGLE_DOCUMENT_AI_PROCESSOR_ID &&
+                     process.env.MOCK_AI_SERVICES !== 'true';
     
-    if (useMock) {
-      return new MockDocumentProcessor();
+    if (useGoogle) {
+      console.log('🔧 Using Google Cloud Document AI');
+      // Import dynamically to avoid issues if package not installed
+      try {
+        const { GoogleDocumentProcessor } = require('./google-document-processor');
+        return new GoogleDocumentProcessor();
+      } catch (error) {
+        console.warn('❌ Failed to load Google Document AI, falling back to mock:', error);
+        return new MockDocumentProcessor();
+      }
     }
     
-    // TODO: Return real Google Document AI service
-    throw new Error('Real DocumentProcessor not implemented yet');
+    console.log('🔧 Using Mock Document Processor');
+    return new MockDocumentProcessor();
   }
 
   static createLLMProvider(): LLMProvider {
-    // Default to mock services in development
-    const useMock = process.env.MOCK_AI_SERVICES !== 'false';
+    // Use real Gemini if API key is configured
+    const useGemini = process.env.GOOGLE_GEMINI_API_KEY && process.env.MOCK_AI_SERVICES !== 'true';
     
-    if (useMock) {
-      return new MockLLMProvider();
+    if (useGemini) {
+      console.log('🔧 Using Gemini LLM Provider');
+      // Import dynamically to avoid issues if package not installed
+      try {
+        const { GeminiLLMProvider } = require('./gemini-llm-provider');
+        return new GeminiLLMProvider();
+      } catch (error) {
+        console.warn('❌ Failed to load Gemini LLM, falling back to mock:', error);
+        return new MockLLMProvider();
+      }
     }
     
-    // TODO: Return real Gemini service
-    throw new Error('Real LLMProvider not implemented yet');
+    console.log('🔧 Using Mock LLM Provider');
+    return new MockLLMProvider();
   }
 
   static createPIIProtectionService(): PIIProtectionService {

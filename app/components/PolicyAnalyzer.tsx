@@ -24,9 +24,12 @@ export default function PolicyAnalyzer({ sessionId, onAnalysisComplete }: Policy
 
   // Use SSE for real-time progress updates
   useEffect(() => {
-    if (!sessionId || results) return;
+    if (!sessionId || results) {
+      console.log('🚫 SSE not starting:', { sessionId, hasResults: !!results });
+      return;
+    }
 
-    console.log(`Setting up SSE for session: ${sessionId}`);
+    console.log(`🔗 Setting up SSE for session: ${sessionId}`);
     
     const eventSource = new EventSource(`/api/policies/progress/${sessionId}`);
 

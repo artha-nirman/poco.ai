@@ -5,7 +5,8 @@ import {
   LLMProvider,
   PIIProtectionService,
   StorageService,
-  NotificationService
+  NotificationService,
+  StructuredDocumentData
 } from './interfaces';
 import { ServiceFactory } from './mock-services';
 import { createSessionStore, SessionStore } from '@/lib/database/session-store';
@@ -46,16 +47,46 @@ export class CorePolicyProcessor implements PolicyProcessor {
     return CorePolicyProcessor.instance;
   }
 
-  async processPolicy(sessionId: string, fileBuffer: Buffer): Promise<AnalysisResults> {
+  async processPolicy(sessionId: string, fileBuffer: Buffer, filename?: string, skipDocumentAI?: boolean): Promise<AnalysisResults> {
     const startTime = Date.now();
     
     try {
       // Create session in database
       await this.sessionStore.createSession(sessionId);
       
-      // Stage 1: Document Processing (15-20 seconds)
-      await this.updateProgress(sessionId, 10, PROCESSING_MESSAGES.EXTRACTING_TEXT);
-      const documentData = await this.documentProcessor.processDocument(fileBuffer);
+      let documentData: StructuredDocumentData;
+      
+      if (skipDocumentAI || (filename && filename.includes('anonymized_document'))) {
+        // Handle text content that has already been processed or is privacy-protected
+        console.log('📝 Processing text content (skipping Document AI)...');
+        await this.updateProgress(sessionId, 10, 'Processing text content...');
+        
+        documentData = {
+          text: fileBuffer.toString('utf-8'),
+          tables: [],
+          entities: [],
+          layout: { pages: [] },
+          confidence: 1.0,
+          processingTime: 0
+        };
+        
+        console.log('📄 Text processing completed:', {
+          textLength: documentData.text.length,
+          source: 'privacy-protected'
+        });
+      } else {
+        // Stage 1: Document Processing with Document AI (15-20 seconds)
+        await this.updateProgress(sessionId, 10, PROCESSING_MESSAGES.EXTRACTING_TEXT);
+        documentData = await this.documentProcessor.processDocument(fileBuffer, filename);
+        
+        console.log('📄 Document processing completed:', {
+          textLength: documentData.text.length,
+          tablesFound: documentData.tables.length,
+          entitiesFound: documentData.entities.length,
+          confidence: documentData.confidence,
+          processingTime: documentData.processingTime + 'ms'
+        });
+      }
       
       // Stage 2: PII Detection and Isolation (10-15 seconds)
       await this.updateProgress(sessionId, 25, PROCESSING_MESSAGES.DETECTING_PII);
@@ -113,7 +144,8 @@ export class CorePolicyProcessor implements PolicyProcessor {
     return await this.sessionStore.getResults(sessionId);
   }
 
-  async createSession(sessionId: string): Promise<void> {
+  async createSession(sessionId: string, filename?: string): Promise<void> {
+    console.log(`📝 Session ${sessionId} created${filename ? ` for file: ${filename}` : ''}`);
     return await this.sessionStore.createSession(sessionId);
   }
 

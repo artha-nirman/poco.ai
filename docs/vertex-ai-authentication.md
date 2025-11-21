@@ -1,4 +1,23 @@
-# Vertex AI Authentication Guide
+# Google Cloud Services Authentication Guide
+
+> **📋 Note**: This project currently uses **Google Document AI** + **Gemini API** instead of Vertex AI for optimal performance and simpler authentication. This document is maintained for reference.
+
+## 🏗️ **Current Implementation**
+
+We use a **dual-API approach** for Google Cloud services:
+
+- **Google Document AI**: Document processing (PDFs, forms, tables)
+- **Google Gemini API**: Text generation, analysis, and embeddings
+
+**Benefits of this approach**:
+- ✅ Simpler authentication (service account + API key)
+- ✅ Better performance for specific tasks  
+- ✅ Lower latency
+- ✅ More cost-effective
+
+---
+
+# Vertex AI Authentication Guide (Reference)
 
 This guide explains how to properly authenticate with Google Cloud Vertex AI in different environments.
 
