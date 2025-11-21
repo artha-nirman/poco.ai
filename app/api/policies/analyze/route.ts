@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CorePolicyProcessor } from '@/lib/services/policy-processor';
+import { API_ERRORS, ERROR_MESSAGES, PROCESSING_CONFIG } from '@/lib/constants';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +14,10 @@ export async function POST(request: NextRequest) {
       
       if (!body.anonymizedContent && !body.originalContent) {
         return NextResponse.json(
-          { error: 'No content provided for analysis' },
+          { 
+            error: API_ERRORS.NO_FILE_PROVIDED,
+            message: ERROR_MESSAGES[API_ERRORS.NO_FILE_PROVIDED]
+          },
           { status: 400 }
         );
       }
@@ -32,7 +36,10 @@ export async function POST(request: NextRequest) {
       
       if (!file) {
         return NextResponse.json(
-          { error: 'No policy file provided' },
+          { 
+            error: API_ERRORS.NO_FILE_PROVIDED,
+            message: ERROR_MESSAGES[API_ERRORS.NO_FILE_PROVIDED]
+          },
           { status: 400 }
         );
       }
@@ -40,14 +47,20 @@ export async function POST(request: NextRequest) {
       // Validate file type and size
       if (file.type !== 'application/pdf') {
         return NextResponse.json(
-          { error: 'Only PDF files are allowed' },
+          { 
+            error: API_ERRORS.INVALID_FILE_TYPE,
+            message: ERROR_MESSAGES[API_ERRORS.INVALID_FILE_TYPE]
+          },
           { status: 400 }
         );
       }
 
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      if (file.size > PROCESSING_CONFIG.MAX_FILE_SIZE_BYTES) {
         return NextResponse.json(
-          { error: 'File size exceeds 10MB limit' },
+          { 
+            error: API_ERRORS.FILE_TOO_LARGE,
+            message: ERROR_MESSAGES[API_ERRORS.FILE_TOO_LARGE]
+          },
           { status: 400 }
         );
       }
@@ -84,7 +97,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Analysis API error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: API_ERRORS.PROCESSING_FAILED,
+        message: ERROR_MESSAGES[API_ERRORS.PROCESSING_FAILED]
+      },
       { status: 500 }
     );
   }

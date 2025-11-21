@@ -15,6 +15,7 @@ import {
   ComparisonResult,
   AnalysisResults 
 } from '@/lib/types';
+import { PROCESSING_MESSAGES, EMAIL_MESSAGES, PRIVACY_CONFIG } from '@/lib/constants';
 
 export class MockDocumentProcessor implements DocumentProcessor {
   async processDocument(buffer: Buffer) {
@@ -332,15 +333,15 @@ export class MockEmailService implements EmailService {
   async sendAnalysisResults(to: string, results: AnalysisResults): Promise<void> {
     await this.sendEmail(
       to,
-      'Your Health Insurance Analysis is Ready',
-      `<h1>Analysis Complete</h1><p>Found ${results.recommendations.length} recommendations.</p>`
+      EMAIL_MESSAGES.ANALYSIS_COMPLETE_SUBJECT,
+      `<h1>${EMAIL_MESSAGES.ANALYSIS_INTRO}</h1><p>Found ${results.recommendations.length} recommendations.</p>`
     );
   }
 
   async sendProgressUpdate(to: string, progress: any): Promise<void> {
     await this.sendEmail(
       to,
-      'Analysis Update',
+      EMAIL_MESSAGES.PROGRESS_UPDATE_SUBJECT,
       `<p>Progress: ${progress.progress}% - ${progress.message}</p>`
     );
   }

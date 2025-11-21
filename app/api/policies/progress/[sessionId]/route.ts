@@ -60,9 +60,11 @@ export async function GET(
 
 function handleSSE(sessionId: string) {
   const encoder = new TextEncoder();
+  let intervalId: NodeJS.Timeout | null = null;
   
   const stream = new ReadableStream({
     start(controller) {
+      console.log(`🔗 SSE connection started for session: ${sessionId}`);
       const processor = CorePolicyProcessor.getInstance();
       
       const sendUpdate = async () => {
@@ -78,6 +80,8 @@ function handleSSE(sessionId: string) {
               error: progress.stage === 'error' ? 'Processing failed' : undefined
             };
 
+            console.log(`📡 SSE sending progress for ${sessionId}:`, formattedProgress);
+
             const data = `data: ${JSON.stringify({
               type: 'progress',
               sessionId,
@@ -90,6 +94,7 @@ function handleSSE(sessionId: string) {
             if (formattedProgress.isComplete) {
               const results = await processor.getResults(sessionId);
               if (results) {
+                console.log(`✅ SSE sending results for ${sessionId}`);
                 const resultData = `data: ${JSON.stringify({
                   type: 'results',
                   sessionId,
@@ -98,11 +103,13 @@ function handleSSE(sessionId: string) {
                 controller.enqueue(encoder.encode(resultData));
                 
                 // Close the stream
+                if (intervalId) clearInterval(intervalId);
                 controller.close();
                 return;
               }
             }
           } else {
+            console.log(`❌ SSE session not found: ${sessionId}`);
             // Session not found, send error and close
             const errorData = `data: ${JSON.stringify({
               type: 'error',
@@ -110,20 +117,19 @@ function handleSSE(sessionId: string) {
               error: 'Session not found'
             })}\n\n`;
             controller.enqueue(encoder.encode(errorData));
+            if (intervalId) clearInterval(intervalId);
             controller.close();
             return;
           }
-          
-          // Continue checking for updates
-          setTimeout(sendUpdate, 1000); // Check every second
         } catch (error) {
-          console.error('SSE error:', error);
+          console.error(`💥 SSE error for ${sessionId}:`, error);
           const errorData = `data: ${JSON.stringify({
             type: 'error',
             sessionId,
             error: 'Internal server error'
           })}\n\n`;
           controller.enqueue(encoder.encode(errorData));
+          if (intervalId) clearInterval(intervalId);
           controller.close();
         }
       };
@@ -135,8 +141,18 @@ function handleSSE(sessionId: string) {
       })}\n\n`;
       controller.enqueue(encoder.encode(initData));
       
-      // Start sending updates
-      setTimeout(sendUpdate, 500);
+      // Start sending updates every second
+      intervalId = setInterval(sendUpdate, 1000);
+      
+      // Also send an immediate update
+      setTimeout(sendUpdate, 100);
+    },
+    
+    cancel() {
+      console.log(`🔌 SSE connection cancelled for session: ${sessionId}`);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     }
   });
 

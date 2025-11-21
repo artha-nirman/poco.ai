@@ -30,10 +30,14 @@ export default function PolicyAnalyzer({ sessionId, onAnalysisComplete }: Policy
     
     const eventSource = new EventSource(`/api/policies/progress/${sessionId}`);
 
+    eventSource.onopen = (event) => {
+      console.log('SSE connection opened:', event);
+    };
+
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('SSE message:', data);
+        console.log('SSE message received:', data);
         
         switch (data.type) {
           case 'connected':
@@ -41,10 +45,12 @@ export default function PolicyAnalyzer({ sessionId, onAnalysisComplete }: Policy
             break;
             
           case 'progress':
+            console.log('Setting progress:', data.progress);
             setProgress(data.progress);
             break;
             
           case 'results':
+            console.log('Analysis complete, setting results');
             setResults(data.results);
             setProgress(null);
             if (onAnalysisComplete) {
@@ -54,24 +60,41 @@ export default function PolicyAnalyzer({ sessionId, onAnalysisComplete }: Policy
             break;
             
           case 'error':
+            console.error('SSE received error:', data.error);
             setError(data.error);
             eventSource.close();
             break;
+            
+          default:
+            console.warn('Unknown SSE message type:', data.type);
         }
       } catch (err) {
-        console.error('Failed to parse SSE data:', err);
+        console.error('Failed to parse SSE data:', err, 'Raw data:', event.data);
       }
     };
 
-    eventSource.onerror = (err) => {
-      console.error('SSE error:', err);
-      setError('Connection error - please try again');
+    eventSource.onerror = (event) => {
+      console.error('SSE connection error:', event);
+      
+      // Check the readyState to understand what happened
+      if (eventSource.readyState === EventSource.CONNECTING) {
+        console.log('SSE reconnecting...');
+      } else if (eventSource.readyState === EventSource.CLOSED) {
+        console.log('SSE connection closed');
+        setError('Connection lost - please refresh the page');
+      } else {
+        console.log('SSE connection failed');
+        setError('Connection error - please try again');
+      }
+      
       eventSource.close();
     };
 
     return () => {
-      console.log('Closing SSE connection');
-      eventSource.close();
+      console.log('Cleaning up SSE connection');
+      if (eventSource.readyState !== EventSource.CLOSED) {
+        eventSource.close();
+      }
     };
   }, [sessionId, results, onAnalysisComplete]);
 

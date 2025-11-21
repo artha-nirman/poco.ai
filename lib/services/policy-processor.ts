@@ -16,6 +16,7 @@ import {
   ComparisonResult,
   ProviderPolicy 
 } from '@/lib/types';
+import { PROCESSING_MESSAGES, PROCESSING_CONFIG } from '@/lib/constants';
 
 // Shared session store instance
 const sharedSessionStore = createSessionStore();
@@ -53,11 +54,11 @@ export class CorePolicyProcessor implements PolicyProcessor {
       await this.sessionStore.createSession(sessionId);
       
       // Stage 1: Document Processing (15-20 seconds)
-      await this.updateProgress(sessionId, 10, 'Processing document structure...');
+      await this.updateProgress(sessionId, 10, PROCESSING_MESSAGES.EXTRACTING_TEXT);
       const documentData = await this.documentProcessor.processDocument(fileBuffer);
       
       // Stage 2: PII Detection and Isolation (10-15 seconds)
-      await this.updateProgress(sessionId, 25, 'Detecting and securing personal information...');
+      await this.updateProgress(sessionId, 25, PROCESSING_MESSAGES.DETECTING_PII);
       const piiData = await this.piiProtection.detectPII(documentData.text);
       const { anonymizedDocument, encryptedPII } = await this.piiProtection.isolatePII(
         documentData.text, 
@@ -65,28 +66,28 @@ export class CorePolicyProcessor implements PolicyProcessor {
       );
 
       // Stage 3: AI Feature Analysis (30-60 seconds)
-      await this.updateProgress(sessionId, 45, 'Analyzing policy features with AI...');
+      await this.updateProgress(sessionId, 45, PROCESSING_MESSAGES.ANALYZING_FEATURES);
       const policyFeatures = await this.llmProvider.analyzeFeatures(anonymizedDocument.anonymizedContent);
       
       // Stage 4: Vector Embedding Generation (5-10 seconds)
-      await this.updateProgress(sessionId, 60, 'Generating semantic embeddings...');
+      await this.updateProgress(sessionId, 60, PROCESSING_MESSAGES.GENERATING_EMBEDDINGS);
       const embedding = await this.llmProvider.generateEmbedding(anonymizedDocument.anonymizedContent);
 
       // Stage 5: Policy Comparison (20-40 seconds)
-      await this.updateProgress(sessionId, 75, 'Comparing with provider policies...');
+      await this.updateProgress(sessionId, 75, PROCESSING_MESSAGES.COMPARING_POLICIES);
       const comparisons = await this.compareWithProviderPolicies(policyFeatures, embedding);
 
       // Stage 6: Recommendation Ranking (5-10 seconds)
-      await this.updateProgress(sessionId, 90, 'Ranking recommendations...');
+      await this.updateProgress(sessionId, 90, PROCESSING_MESSAGES.CALCULATING_SCORES);
       const rankedRecommendations = await this.rankRecommendations(comparisons, policyFeatures);
 
       // Stage 7: Results Generation (5 seconds)
-      await this.updateProgress(sessionId, 100, 'Analysis complete!');
+      await this.updateProgress(sessionId, 100, PROCESSING_MESSAGES.ANALYSIS_COMPLETE);
       
       const results: AnalysisResults = {
         sessionId,
         userPolicyFeatures: policyFeatures,
-        recommendations: rankedRecommendations.slice(0, 5), // Top 5 recommendations
+        recommendations: rankedRecommendations.slice(0, PROCESSING_CONFIG.DEFAULT_TOP_N_RESULTS),
         totalPoliciesCompared: comparisons.length,
         processingTimeMs: Date.now() - startTime,
         confidence: this.calculateOverallConfidence(rankedRecommendations),
