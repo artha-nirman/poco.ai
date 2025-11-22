@@ -31,6 +31,7 @@ This document outlines the comprehensive PII (Personally Identifiable Informatio
 3. **Storage Limitation**: Auto-purge PII after 24 hours maximum
 4. **Security by Default**: Encrypt all PII, zero-trust access model
 5. **Transparency**: Clear disclosure of PII collection and processing
+6. **Compile-time Safety**: TypeScript type system prevents PII leaks at development time
 
 ### 3.2 Three-Layer Protection Model
 
@@ -60,14 +61,52 @@ This document outlines the comprehensive PII (Personally Identifiable Informatio
 
 ## 4. Technical Implementation
 
+### 4.0 Type-Safe PII Protection
+
+```typescript
+// COMPILE-TIME PII PROTECTION through inheritance hierarchy
+interface BasePolicyFeatures {
+  policyType: 'hospital' | 'extras' | 'combined';
+  // ...common structure
+}
+
+// USER POLICIES - PII-aware with state markers
+interface UserPolicyFeatures extends BasePolicyFeatures {
+  readonly _context: 'USER_POLICY';
+  readonly _piiStatus: 'CONTAINS_PII' | 'ANONYMIZED' | 'ENCRYPTED';
+}
+
+interface AnonymizedUserPolicyFeatures extends UserPolicyFeatures {
+  readonly _piiStatus: 'ANONYMIZED';  // Compile-time guarantee
+}
+
+// PROVIDER POLICIES - Always clean, no PII
+interface ProviderPolicyFeatures extends BasePolicyFeatures {
+  readonly _context: 'PROVIDER_POLICY';
+  readonly _piiStatus: 'NO_PII';      // Compile-time guarantee
+}
+
+// TYPE-SAFE FUNCTIONS - Compiler enforces correct usage
+// See /docs/architecture/service-abstractions.md for complete function signatures
+function compareWithProviders(
+  userFeatures: AnonymizedUserPolicyFeatures,  // Must be anonymized
+  providers: ProviderPolicyFeatures[]          // Always clean
+): ComparisonResult[];
+```
+
 ### 4.1 PII Detection Service
 
 ```typescript
 interface PIIDetector {
   /**
    * Scans document content for PII using multiple detection methods
+   * Returns UserPolicyFeatures with _piiStatus: 'CONTAINS_PII'
    */
-  detectPII(content: string): PIIDetectionResult;
+  detectPII(content: string): Promise<{
+    features: UserPolicyFeatures;  // Marked as CONTAINS_PII
+    detectedPII: PIIItem[];
+    confidence: number;
+  }>;
 }
 
 interface PIIDetectionResult {

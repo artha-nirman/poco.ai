@@ -314,20 +314,28 @@ Poco.ai provides an AI-powered insurance advisor that:
 
 **PII-Safe API Design**:
 ```typescript
-// SECURE CORE APIs with PII isolation
+// SECURE CORE APIs with PII isolation and type safety
 /api/secure/
 ├── extract-pii          # POST - PII detection and secure storage
-├── process-anonymized   # POST - Anonymized document processing
+├── process-anonymized   # POST - Anonymized document processing  
 ├── personalize-results  # POST - Optional PII reintegration
 └── purge-pii           # DELETE - Secure data deletion
 
-// ANONYMIZED PROCESSING (No PII exposure)
+// ANONYMIZED PROCESSING (No PII exposure, type-safe)
 /api/core/
-├── analyze-features     # POST - Feature analysis (PII-free)
-├── compare-policies     # POST - Policy comparison (anonymized)
+├── analyze-features     # POST - Feature analysis (AnonymizedUserPolicyFeatures)
+├── compare-policies     # POST - Policy comparison (vs ProviderPolicyFeatures)
 ├── rank-results        # POST - Ranking and scoring (generic)
 └── format-output       # POST - Result formatting (no PII)
 ```
+
+**Type-Safe Policy Architecture**:
+- **Provider Policies**: Always PII-free with compile-time guarantees
+- **User Policies**: PII-aware processing with state tracking (CONTAINS_PII → ANONYMIZED → ENCRYPTED)
+- **Inheritance Design**: All policies extend common base with safety markers
+- **Compile-time Safety**: TypeScript enforces that only anonymized data reaches AI services
+
+*Technical Implementation*: See `/docs/architecture/technical-architecture.md` and `/docs/architecture/service-abstractions.md`
 
 **Reusable Data Flow**:
 ```
@@ -348,14 +356,15 @@ Output Adapter (Web JSON/Email HTML) → Channel Delivery
 
 ### 5.4.1 Service Abstractions for Reusability
 
-```typescript
-// Core reusable interfaces
-interface PolicyProcessor {
-  // REUSABLE: Same processing logic regardless of input source
-  processPolicy(sessionId: string, fileBuffer: Buffer): Promise<ProcessingResult>;
-  getProgress(sessionId: string): Promise<ProgressState>;
-  getResults(sessionId: string): Promise<ComparisonResults>;
-}
+**Core Reusable Interfaces**:
+- **PolicyProcessor**: Single processing engine regardless of input source
+- **Channel Adapters**: Unified input handling for web uploads and email processing
+- **Result Formatters**: Shared presentation logic for multiple output formats
+- **Session Management**: Common progress tracking across all channels
+
+*Technical Details*: See `/docs/architecture/service-abstractions.md` for complete interface definitions
+
+**Channel-Agnostic Processing**:
 
 interface InputAdapter {
   // CHANNEL-SPECIFIC: Different implementations for web vs email
@@ -814,11 +823,13 @@ interface SecurityConfig {
 ### 12.2 Code Reusability Validation
 - **Core Processing Logic**: Single implementation serves both channels (>90% reuse)
 - **Business Rules**: Shared validation, formatting, and calculation logic
-- **Data Models**: Common interfaces used across all services
+- **Data Models**: Common interfaces used across all services with proper type inheritance
+- **Type Safety**: Compile-time PII protection through Provider vs User policy distinctions
 - **Session Management**: Unified system handles both web and email sessions
 - **Progress Tracking**: Single progress system with multiple output methods
 - **Result Formatting**: Shared business logic with channel-specific presentation
 - **Error Handling**: Common error processing with channel-appropriate delivery
+- **PII Boundaries**: Clear separation enforced by TypeScript type system
 
 ### 12.2 Success Validation
 - Complete end-to-end user journey via both web and email channels

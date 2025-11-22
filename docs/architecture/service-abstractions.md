@@ -3,6 +3,64 @@
 ## Overview
 Ensure all cloud services and LLM providers are swappable through well-defined interfaces and dependency injection.
 
+## V2 Flexible Policy Architecture
+
+```typescript
+// COUNTRY-AGNOSTIC CORE STRUCTURE
+interface BasePolicyFeatures {
+  country: string;                           // 'AU', 'SG', 'NZ'
+  regulatoryFramework: string;               // Framework identifier
+  classification: PolicyClassification;       // Dynamic tier system
+  coverageCategories: Record<string, CoverageCategory>; // Flexible features
+  constraints: PolicyConstraint[];           // Country-specific rules
+  metadata: PolicyMetadata;
+}
+
+// FLEXIBLE CLASSIFICATION SYSTEM
+interface PolicyClassification {
+  primaryType: string;                       // Configurable policy type
+  tierSystem?: TierDefinition;              // Optional: countries without tiers
+  regulatoryCategory?: string;              // Country-specific category
+}
+
+// DYNAMIC COVERAGE STRUCTURE
+interface CoverageCategory {
+  categoryId: string;                       // 'hospital' | 'dental' | 'optical'
+  displayName: string;                      // Localized name
+  features: Record<string, FeatureDetail>;
+  categoryConstraints: CategoryConstraint[];
+}
+
+// PROVIDER POLICIES - Always clean, compile-time guaranteed
+interface ProviderPolicyFeatures extends BasePolicyFeatures {
+  readonly _context: 'PROVIDER_POLICY';
+  readonly _piiStatus: 'NO_PII';
+  premiumRanges: {
+    single: { min: number; max: number };
+    couple: { min: number; max: number };
+    family: { min: number; max: number };
+  };
+}
+
+// USER POLICIES - PII-aware with state tracking
+interface UserPolicyFeatures extends BasePolicyFeatures {
+  readonly _context: 'USER_POLICY';
+  readonly _piiStatus: 'CONTAINS_PII' | 'ANONYMIZED' | 'ENCRYPTED';
+}
+
+interface AnonymizedUserPolicyFeatures extends UserPolicyFeatures {
+  readonly _piiStatus: 'ANONYMIZED';
+  premiumCategory: 'under-200' | '200-400' | '400-600' | 'over-600';
+  excessCategory: 'none' | 'under-500' | '500-1000' | 'over-1000';
+}
+
+interface EncryptedUserPolicyFeatures extends UserPolicyFeatures {
+  readonly _piiStatus: 'ENCRYPTED';
+  encryptedPremiumAmount?: string;
+  encryptedPersonalConditions?: string[];
+}
+```
+
 ## Document Processing Abstraction
 
 ```typescript
@@ -50,21 +108,71 @@ interface DocumentProcessorCapabilities {
 ## LLM Provider Abstraction
 
 ```typescript
-// Core interface for LLM providers
+// Type-safe LLM interface with PII protection
 interface LLMProvider {
   name: string;
-  provider: 'openai' | 'anthropic' | 'google' | 'azure' | 'local';
-  models: string[];
+  provider: 'openai' | 'google' | 'azure' | 'anthropic' | 'local';
   
-  analyzeDocument(
-    documentData: StructuredDocumentData | string,
-    prompt: string,
-    options?: LLMOptions
-  ): Promise<LLMResponse>;
+  // ONLY accepts anonymized user policy features for AI processing
+  analyzeFeatures(
+    content: string | StructuredDocumentData
+  ): Promise<AnonymizedUserPolicyFeatures>;
   
-  getCapabilities(): LLMCapabilities;
-  estimateCost(inputTokens: number, outputTokens: number): number;
+  // Safe embedding generation (no PII)
+  generateEmbedding(content: string): Promise<number[]>;
+  
+  // Comparison explanation between anonymized features
+  explainRecommendation(
+    userFeatures: AnonymizedUserPolicyFeatures,
+    providerFeatures: ProviderPolicyFeatures,
+    comparison: ComparisonResult
+  ): Promise<string[]>;
+  
+  getCapabilities(): LLMProviderCapabilities;
+  estimateCost(tokenCount: number): number;
   isAvailable(): Promise<boolean>;
+}
+
+// Compile-time safety function signatures
+type SafeComparisonFunction = (
+  userFeatures: AnonymizedUserPolicyFeatures,  // Must be anonymized
+  providerFeatures: ProviderPolicyFeatures[]   // Always clean
+) => Promise<ComparisonResult[]>;
+```
+
+## Type-Safe Policy Processing Interface
+
+```typescript
+// PII-safe policy processing with compile-time guarantees
+interface PolicyProcessor {
+  // Stage 1: Upload and initial processing
+  uploadUserPolicy(file: Buffer, filename?: string): Promise<UserPolicyDocument>;
+  
+  // Stage 2: PII detection and encryption (with user consent)
+  extractAndEncryptPII(
+    doc: UserPolicyDocument
+  ): Promise<{
+    encrypted: EncryptedUserPolicyFeatures;
+    piiKey: string;
+  }>;
+  
+  // Stage 3: Safe anonymization for AI processing
+  anonymizeForAI(
+    encrypted: EncryptedUserPolicyFeatures
+  ): Promise<AnonymizedUserPolicyFeatures>;
+  
+  // Stage 4: Comparison against provider policies (PII-free zone)
+  compareWithProviders(
+    anonymized: AnonymizedUserPolicyFeatures,
+    providers: ProviderPolicyFeatures[]
+  ): Promise<ComparisonResult[]>;
+  
+  // Stage 5: Optional personalization (with explicit consent)
+  personalizeResults(
+    results: ComparisonResult[],
+    piiKey: string,
+    consent: PersonalizationConsent
+  ): Promise<PersonalizedResults>;
 }
 
 interface LLMOptions {

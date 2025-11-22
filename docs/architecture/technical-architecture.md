@@ -28,9 +28,20 @@
 
 ### Database Design
 - **Primary Database**: PostgreSQL with pgvector extension for embeddings
-- **Schema**: Implement from `/docs/database/schemas.sql`
-- **Evolution**: Follow strategy from `/docs/database/evolution-strategy.md`
+- **Schema**: Flexible JSONB structure for country-agnostic policies
+- **Evolution**: Configuration-driven changes, no breaking schema migrations
 - **User Sessions**: Temporary storage with auto-cleanup, status tracking via KV store
+
+### V2 Flexible Policy Architecture
+- **Country-Agnostic Core**: Configuration-driven policy structure supporting multiple regulatory frameworks
+- **Dynamic Features**: Flexible coverage categories loaded from country configurations
+- **Type Safety**: Compile-time PII protection through inheritance markers
+- **Global Scalability**: Add new countries through JSON configuration files
+- **BasePolicyFeatures**: Universal interface with country-specific extensions
+- **ProviderPolicyFeatures**: Always PII-free with compile-time guarantee (`_piiStatus: 'NO_PII'`)
+- **UserPolicyFeatures**: PII-aware processing with state tracking (`CONTAINS_PII | ANONYMIZED | ENCRYPTED`)
+- **AnonymizedUserPolicyFeatures**: Safe for AI processing, extends UserPolicyFeatures
+- **Country Configurations**: JSON-based regulatory framework definitions
 
 ### Security & Compliance
 - **PII Protection**: Three-layer model (detection → isolation → encryption)
@@ -46,12 +57,33 @@
 - **Dual Channel**: Web upload + email processing with unified backend
 - **Status Tracking**: Session-based progress via KV store
 - **Error Handling**: Graceful fallbacks with user-friendly messaging
+- **Type Safety**: Compile-time PII protection through strict interface inheritance
+
+### Type-Safe Processing Pipeline
+```typescript
+// Stage 1: Upload (UserPolicyDocument with potential PII)
+uploadUserPolicy(file: Buffer): Promise<UserPolicyDocument>
+
+// Stage 2: PII Detection & Encryption
+extractAndEncryptPII(doc: UserPolicyDocument): Promise<EncryptedUserPolicyFeatures>
+
+// Stage 3: Safe Anonymization for AI
+anonymizeForAI(encrypted: EncryptedUserPolicyFeatures): Promise<AnonymizedUserPolicyFeatures>
+
+// Stage 4: Comparison (PII-free zone)
+compareWithProviders(
+  anonymized: AnonymizedUserPolicyFeatures,
+  providers: ProviderPolicyFeatures[]
+): Promise<ComparisonResult[]>
+```
 
 ### Comparison Engine
 - **Strategy**: Multi-policy analysis (compare against ALL provider policies, not 1:1)
 - **Configuration**: User-configurable top-N results (3, 5, 8, etc.)
 - **Scoring**: Feature-level analysis with conditions, exceptions, riders
 - **Ranking**: Composite scoring with user preference weighting
+- **Type Safety**: Only AnonymizedUserPolicyFeatures can be compared against ProviderPolicyFeatures
+- **Compile-time Protection**: TypeScript prevents PII-containing data from reaching AI services
 
 ### Data Models
 - **PolicyFeature**: Core coverage item with conditions, exceptions, riders

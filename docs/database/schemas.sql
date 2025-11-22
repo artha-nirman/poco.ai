@@ -387,8 +387,11 @@ CREATE TABLE policy_features (
 );
 
 -- ============================================================================
--- 5. USER SESSIONS (Temporary session management)
+-- 5. USER SESSIONS (Temporary session management with PII protection)
 -- ============================================================================
+-- IMPORTANT: User sessions may contain PII and require special handling.
+-- User policy data goes through: CONTAINS_PII → ENCRYPTED → ANONYMIZED → AI_SAFE
+-- Only anonymized versions can be used for AI processing.
 
 CREATE TABLE user_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -398,13 +401,13 @@ CREATE TABLE user_sessions (
   channel_type VARCHAR(20) NOT NULL,       -- 'web', 'email'
   delivery_preference VARCHAR(20),         -- 'immediate', 'email', 'both'
   
-  -- Processing status
+  -- Processing status and type-safe state tracking
   status VARCHAR(50) NOT NULL DEFAULT 'created',
   progress_percentage INTEGER DEFAULT 0,
   current_stage VARCHAR(100),
   error_message TEXT,
   
-  -- Results metadata (no PII in results)
+  -- Results metadata (anonymized only, corresponds to AnonymizedUserPolicyFeatures)
   has_results BOOLEAN DEFAULT FALSE,
   results_generated_at TIMESTAMP WITH TIME ZONE,
   top_n_recommendations INTEGER DEFAULT 5,
@@ -476,8 +479,11 @@ CREATE TABLE comparison_results (
 );
 
 -- ============================================================================
--- 7. PROVIDER POLICY DATABASE (Reference data, no PII)
+-- 7. PROVIDER POLICY DATABASE (Reference data, no PII, always clean)
 -- ============================================================================
+-- IMPORTANT: Provider policies are always PII-free and safe for AI processing
+-- They contain only generic policy features, premium ranges (not specific amounts),
+-- and publicly available information. No customer personal information.
 
 CREATE TABLE insurance_providers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -504,13 +510,14 @@ CREATE TABLE provider_policies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   provider_id UUID NOT NULL REFERENCES insurance_providers(id),
   
-  -- Policy identification (no customer PII)
+  -- Policy identification (no customer PII, always safe for AI)
   policy_code VARCHAR(50) NOT NULL,        -- Provider's policy identifier
   policy_name VARCHAR(200) NOT NULL,
   policy_type VARCHAR(50) NOT NULL,        -- 'hospital', 'extras', 'combined'
   policy_tier VARCHAR(20) NOT NULL,        -- 'basic', 'bronze', 'silver', 'gold'
   
-  -- Premium structure (ranges, not specific amounts)
+  -- Premium structure (ranges only, never specific customer amounts)
+  -- Corresponds to ProviderPolicyFeatures interface
   premium_range_single JSONB,              -- Min/max premium ranges for single
   premium_range_couple JSONB,              -- Min/max premium ranges for couple  
   premium_range_family JSONB,              -- Min/max premium ranges for family

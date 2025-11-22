@@ -65,6 +65,55 @@ async function initializeDatabase() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )`,
+
+      // V2 Database Tables for Country-Agnostic Architecture
+      `CREATE TABLE IF NOT EXISTS v2_user_sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        session_id TEXT UNIQUE NOT NULL,
+        country_code TEXT NOT NULL,
+        country_name TEXT,
+        status TEXT NOT NULL DEFAULT 'created',
+        progress_percentage INTEGER DEFAULT 0,
+        current_stage TEXT DEFAULT 'initializing',
+        stages JSONB,
+        estimated_completion TIMESTAMPTZ,
+        started_at TIMESTAMPTZ DEFAULT NOW(),
+        last_updated TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '7 days'),
+        policy_text TEXT,
+        policy_type TEXT,
+        provider_name TEXT,
+        user_preferences JSONB,
+        request_metadata JSONB,
+        error_code TEXT,
+        error_message TEXT,
+        CHECK (status IN ('created', 'processing', 'completed', 'failed', 'expired')),
+        CHECK (progress_percentage >= 0 AND progress_percentage <= 100)
+      )`,
+
+      `CREATE TABLE IF NOT EXISTS v2_analysis_results (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        session_id TEXT NOT NULL REFERENCES v2_user_sessions(session_id) ON DELETE CASCADE,
+        country_code TEXT NOT NULL,
+        analysis_data JSONB NOT NULL,
+        policy JSONB,
+        recommendations JSONB,
+        metadata JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+
+      `CREATE TABLE IF NOT EXISTS v2_country_configurations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        country_code TEXT UNIQUE NOT NULL,
+        country_name TEXT NOT NULL,
+        config_data JSONB NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
       
       // Indexes
       `CREATE INDEX IF NOT EXISTS idx_user_sessions_session_id ON user_sessions(session_id)`,
@@ -74,7 +123,19 @@ async function initializeDatabase() {
       `CREATE INDEX IF NOT EXISTS idx_user_sessions_channel ON user_sessions(channel)`,
       `CREATE INDEX IF NOT EXISTS idx_provider_policies_provider_code ON provider_policies(provider_code)`,
       `CREATE INDEX IF NOT EXISTS idx_provider_policies_policy_type ON provider_policies(policy_type)`,
-      `CREATE INDEX IF NOT EXISTS idx_provider_policies_is_active ON provider_policies(is_active)`
+      `CREATE INDEX IF NOT EXISTS idx_provider_policies_is_active ON provider_policies(is_active)`,
+      
+      // V2 Indexes
+      `CREATE INDEX IF NOT EXISTS idx_v2_user_sessions_session_id ON v2_user_sessions(session_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_v2_user_sessions_country_code ON v2_user_sessions(country_code)`,
+      `CREATE INDEX IF NOT EXISTS idx_v2_user_sessions_status ON v2_user_sessions(status)`,
+      `CREATE INDEX IF NOT EXISTS idx_v2_user_sessions_expires_at ON v2_user_sessions(expires_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_v2_user_sessions_started_at ON v2_user_sessions(started_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_v2_user_sessions_last_updated ON v2_user_sessions(last_updated)`,
+      `CREATE INDEX IF NOT EXISTS idx_v2_analysis_results_session_id ON v2_analysis_results(session_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_v2_analysis_results_country_code ON v2_analysis_results(country_code)`,
+      `CREATE INDEX IF NOT EXISTS idx_v2_country_configurations_country_code ON v2_country_configurations(country_code)`,
+      `CREATE INDEX IF NOT EXISTS idx_v2_country_configurations_is_active ON v2_country_configurations(is_active)`
     ]
     
     for (const statement of statements) {

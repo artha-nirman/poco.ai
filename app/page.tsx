@@ -1,185 +1,174 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import PolicyAnalyzer from './components/PolicyAnalyzer';
-import PrivacyProtection from './components/PrivacyProtection';
-import SystemStatusIndicator from './components/SystemStatusIndicator';
-import { Shield, Zap, Users, CheckCircle, Lock, Eye, Settings, Database } from 'lucide-react';
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { getSupportedCountries, getCountryDisplayName } from '@/lib/config/country-loader'
 
-export default function Home() {
-  const [analysisSessionId, setAnalysisSessionId] = useState<string | null>(null);
+interface CountryOption {
+  code: string
+  name: string
+  flag: string
+}
 
-  const handleDocumentProcessed = (sessionId: string) => {
-    console.log('🔄 Document processed callback received with sessionId:', sessionId);
-    setAnalysisSessionId(sessionId);
-    console.log('✅ Analysis session ID set to:', sessionId);
-  };
+export default function LandingPage() {
+  const [countries, setCountries] = useState<CountryOption[]>([])
+  const [selectedCountry, setSelectedCountry] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    loadCountries()
+  }, [])
+
+  const loadCountries = async () => {
+    try {
+      const supportedCountries = getSupportedCountries()
+      const countryOptions = await Promise.all(
+        supportedCountries.map(async (code) => ({
+          code: code.toLowerCase(),
+          name: await getCountryDisplayName(code),
+          flag: getFlagEmoji(code)
+        }))
+      )
+      setCountries(countryOptions)
+      
+      // Auto-detect user's country (placeholder logic)
+      const detectedCountry = await detectUserCountry()
+      setSelectedCountry(detectedCountry)
+    } catch (error) {
+      console.error('Failed to load countries:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const detectUserCountry = async (): Promise<string> => {
+    // TODO: Implement IP geolocation
+    // For now, default to Australia
+    return 'au'
+  }
+
+  const getFlagEmoji = (countryCode: string): string => {
+    const flags: Record<string, string> = {
+      AU: '🇦🇺',
+      SG: '🇸🇬', 
+      NZ: '🇳🇿'
+    }
+    return flags[countryCode.toUpperCase()] || '🌍'
+  }
+
+  const handleStartAnalysis = () => {
+    if (selectedCountry) {
+      router.push(`/${selectedCountry}/policies/analyze`)
+    }
+  }
+
+  const handleQuickStart = () => {
+    // Use auto-detected country for quick start
+    router.push('/policies/analyze')
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 py-24">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight">
-            Smart Health Insurance
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">Comparison</span>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Welcome to Poco.ai
           </h1>
-          <p className="text-xl text-gray-300 mb-10 max-w-3xl mx-auto leading-relaxed">
-            AI-powered analysis of your policy with instant recommendations from Australia's top providers.
+          <p className="text-xl text-gray-600">
+            AI-powered health insurance comparison platform
           </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Privacy-first • Transparent • Expert-level analysis
+          </p>
+        </div>
+
+        {/* Country Selection */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold text-gray-800 mb-4 text-center">
+            Select Your Country
+          </h2>
+          <div className="grid gap-4 md:grid-cols-3">
+            {countries.map((country) => (
+              <button
+                key={country.code}
+                onClick={() => setSelectedCountry(country.code)}
+                className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                  selectedCountry === country.code
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                }`}
+              >
+                <div className="text-3xl mb-2">{country.flag}</div>
+                <div className="font-medium">{country.name}</div>
+                <div className="text-sm text-gray-500 uppercase">{country.code}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-4">
+          <button
+            onClick={handleStartAnalysis}
+            disabled={!selectedCountry}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 
+                     text-white font-semibold py-4 px-6 rounded-lg transition-colors
+                     disabled:cursor-not-allowed"
+          >
+            Start Policy Analysis
+          </button>
           
-          <div className="flex justify-center items-center gap-12 mb-10 text-gray-300">
-            <div className="flex items-center">
-              <Shield className="w-6 h-6 text-cyan-400 mr-3" />
-              <span className="font-medium">Privacy-First</span>
-            </div>
-            <div className="flex items-center">
-              <Zap className="w-6 h-6 text-cyan-400 mr-3" />
-              <span className="font-medium">Under 3 Minutes</span>
-            </div>
-            <div className="flex items-center">
-              <Users className="w-6 h-6 text-cyan-400 mr-3" />
-              <span className="font-medium">All Major Providers</span>
-            </div>
-          </div>
-          
-          <div className="text-center">
-            <a href="#upload" className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-10 py-4 rounded-full text-lg shadow-2xl transform hover:scale-105 transition-all duration-300 inline-block">
-              Start Free Analysis
-            </a>
-            <p className="text-gray-400 text-sm mt-4">
-              No signup required • Complete privacy guarantee
-            </p>
-          </div>
+          <button
+            onClick={handleQuickStart}
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 
+                     font-medium py-3 px-6 rounded-lg transition-colors"
+          >
+            Quick Start (Auto-detect Location)
+          </button>
         </div>
-      </section>
 
-      {/* Upload Your Current Policy Section */}
-      <section id="upload" className="py-20 bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Upload Your Policy
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
-              Drag & drop or click to upload • PDF, Word, or image files
-            </p>
-          </div>
-          <PrivacyProtection onDocumentProcessed={handleDocumentProcessed} />
-        </div>
-      </section>
-
-      {/* Analysis Results Section */}
-      {analysisSessionId && (
-        <section className="py-12 bg-background">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <PolicyAnalyzer sessionId={analysisSessionId} />
-          </div>
-        </section>
-      )}
-
-      {/* Privacy Protection Section */}
-      <section className="py-20 bg-white dark:bg-gray-800">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Enterprise-Grade Privacy
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Your data is automatically protected with bank-level security before any AI analysis begins
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Data Detection Card */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 border border-blue-100 dark:border-gray-700 shadow-xl">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-6">
-                <Eye className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                Smart Detection
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-700 dark:text-gray-300">Personal Info</span>
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">Encrypted</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-700 dark:text-gray-300">Policy Data</span>
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">Anonymized</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-700 dark:text-gray-300">Medical Info</span>
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">Isolated</span>
-                </div>
-              </div>
+        {/* Features */}
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          <div className="flex items-start space-x-3">
+            <div className="text-green-500 text-xl">🔒</div>
+            <div>
+              <h3 className="font-semibold text-gray-800">Privacy First</h3>
+              <p className="text-sm text-gray-600">Zero-knowledge architecture</p>
             </div>
-
-            {/* User Control Card */}
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 border border-purple-100 dark:border-gray-700 shadow-xl">
-              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center mb-6">
-                <Settings className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                Your Control
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-700 dark:text-gray-300">Personal Results</span>
-                  <span className="text-gray-500 dark:text-gray-400 font-medium">Optional</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-700 dark:text-gray-300">Location Data</span>
-                  <span className="text-gray-500 dark:text-gray-400 font-medium">Your Choice</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-700 dark:text-gray-300">Data Retention</span>
-                  <span className="text-gray-500 dark:text-gray-400 font-medium">Configurable</span>
-                </div>
-              </div>
+          </div>
+          <div className="flex items-start space-x-3">
+            <div className="text-blue-500 text-xl">🤖</div>
+            <div>
+              <h3 className="font-semibold text-gray-800">AI Powered</h3>
+              <p className="text-sm text-gray-600">Expert-level analysis</p>
             </div>
-
-            {/* Data Rights Card */}
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 border border-green-100 dark:border-gray-700 shadow-xl">
-              <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mb-6">
-                <Database className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                Data Rights
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-700 dark:text-gray-300">Auto-deletion</span>
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">24 Hours</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-700 dark:text-gray-300">Right to Erasure</span>
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">Instant</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-700 dark:text-gray-300">Audit Trail</span>
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">Complete</span>
-                </div>
-              </div>
+          </div>
+          <div className="flex items-start space-x-3">
+            <div className="text-purple-500 text-xl">⚡</div>
+            <div>
+              <h3 className="font-semibold text-gray-800">Fast Results</h3>
+              <p className="text-sm text-gray-600">60-second analysis</p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-3">
+            <div className="text-orange-500 text-xl">🌍</div>
+            <div>
+              <h3 className="font-semibold text-gray-800">Global Support</h3>
+              <p className="text-sm text-gray-600">Multi-country coverage</p>
             </div>
           </div>
         </div>
-      </section>
-
-      {/* System Status Section */}
-      <section className="py-12 bg-background">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-6">
-            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">
-              System Status
-            </h2>
-            <p className="text-gray-600 dark:text-gray-300">
-              Real-time security monitoring
-            </p>
-          </div>
-          <SystemStatusIndicator />
-        </div>
-      </section>
+      </div>
     </div>
-  );
+  )
 }

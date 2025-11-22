@@ -57,12 +57,24 @@ For any architectural changes, new features, or significant technical decisions:
 /docs/             - Project documentation
 ```
 
+#### **CRITICAL: V2 Flexible Policy Architecture**
+- **Country-Agnostic Design**: All policies use configuration-driven structure from `/lib/config/countries/`
+- **Provider Policies**: Always PII-free, use `ProviderPolicyFeatures` interface with country context
+- **User Policies**: PII-aware processing with state markers: `CONTAINS_PII` | `ANONYMIZED` | `ENCRYPTED`
+- **Type Inheritance**: All policies extend `BasePolicyFeatures` with compile-time safety markers
+- **Compile-time PII Protection**: TypeScript enforces that only `AnonymizedUserPolicyFeatures` can be passed to AI services
+- **Function Signatures**: Must specify exact policy type (Provider/User/Anonymized) AND country for type safety
+- **Country Configurations**: Load country-specific rules from JSON configs, never hardcode regulatory details
+- **Clean URLs**: Use `/au/policies/analyze` pattern, avoid `/countries/au/` verbose structure
+
 #### Code Quality Standards
 - **TypeScript**: Strict typing with comprehensive interfaces
+- **PII Type Safety**: Use `ProviderPolicyFeatures` vs `AnonymizedUserPolicyFeatures` vs `EncryptedUserPolicyFeatures` appropriately
+- **Compile-time PII Protection**: Functions must specify exact policy types, no generic `PolicyFeatures`
 - **Error Handling**: Try-catch blocks with structured responses
 - **Constants**: ALL text/prompts/config in `/lib/constants/` files
-- **Comments**: Document decisions, business logic, and temporary solutions
-- **Testing**: Unit tests for logic, integration tests for APIs, E2E for user journeys
+- **Comments**: Document decisions, business logic, temporary solutions, and PII boundaries
+- **Testing**: Unit tests for logic, integration tests for APIs, E2E for user journeys, PII protection validation
 
 #### Mock Data & Development
 - **Mock Notifications**: Always notify user when implementing mock functionality
@@ -79,8 +91,10 @@ For any architectural changes, new features, or significant technical decisions:
 **CRITICAL REMINDER**: Before ANY file creation or modification:
 1. Re-read these instructions completely
 2. Check if existing files can be updated instead
-3. Get explicit approval for new files
-4. Keep instructions generic and reusable
+3. Verify correct Provider vs User policy type usage
+4. Ensure PII protection through type system
+5. Get explicit approval for new files
+6. Keep instructions generic and reusable
 
 ---
 

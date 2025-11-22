@@ -1,0 +1,1413 @@
+openapi: 3.0.3
+info:
+  title: Poco.ai V2 Policy Analysis API
+  description: |
+    Country-agnostic insurance policy analysis and comparison platform with advanced PII protection and real-time processing.
+    
+    ## Features
+    - Multi-country support (AU, SG, NZ) with flexible regulatory frameworks
+    - Real-time analysis progress via Server-Sent Events
+    - Advanced PII detection, encryption, and anonymization
+    - AI-powered policy feature extraction and comparison
+    - Comprehensive provider recommendations with detailed scoring
+    
+    ## Authentication
+    Currently using session-based authentication. API key authentication coming in future releases.
+    
+    ## Rate Limiting
+    - Analysis requests: 10 per hour per IP
+    - Progress requests: 60 per minute per session
+    - Results requests: 30 per minute per session
+  version: 2.0.0
+  contact:
+    name: Poco.ai API Support
+    url: https://poco.ai/support
+    email: api-support@poco.ai
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://poco.ai/terms
+
+servers:
+  - url: https://poco.ai/api/v2
+    description: Production server
+  - url: https://staging.poco.ai/api/v2
+    description: Staging server
+  - url: http://localhost:3000/api/v2
+    description: Development server
+
+paths:
+  /v2/{country}/policies/analyze:
+    post:
+      summary: Start Policy Analysis
+      description: |
+        Initiates comprehensive analysis of an insurance policy document for the specified country.
+        The analysis includes PII detection/protection, AI feature extraction, and provider comparison.
+      operationId: analyzePolicy
+      tags:
+        - Policy Analysis
+      parameters:
+        - name: country
+          in: path
+          required: true
+          description: ISO 3166-1 alpha-2 country code
+          schema:
+            type: string
+            enum: [AU, SG, NZ]
+          examples:
+            australia:
+              value: AU
+              description: Australia
+            singapore:
+              value: SG
+              description: Singapore
+            new_zealand:
+              value: NZ
+              description: New Zealand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/V2AnalysisRequest'
+            examples:
+              basic_analysis:
+                summary: Basic policy analysis
+                value:
+                  policy_text: "Hospital Insurance Policy\nProvider: HCF\nPremium: $250/month\nCoverage: Silver Hospital Cover\nExcess: $500\n\nCovered Services:\n- Emergency surgery\n- Cardiology\n- Orthopedics\n\nExclusions:\n- Cosmetic surgery\n- Dental (except emergency)"
+              detailed_analysis:
+                summary: Analysis with preferences and options
+                value:
+                  policy_text: "PRIVATE HEALTH INSURANCE STATEMENT\nPolicyowner: John Smith\nPolicy Number: PHI123456\nPremium: $280.50 monthly\nCoverage Tier: Gold Hospital + Extras\nExcess: $500 hospital, $100 extras\n\nHospital Benefits:\n- Private room guarantee\n- No waiting periods for emergencies\n- Surgery with choice of doctor\n- Cardiac procedures\n- Cancer treatment\n\nExtras Benefits:\n- Dental: 80% up to $1,200\n- Optical: $300 annual limit\n- Physiotherapy: 80% up to $800\n- Psychology: $150 per session, 10 sessions"
+                  user_preferences:
+                    max_premium: 350
+                    preferred_providers: ["MEDIBANK", "BUPA", "NIB"]
+                    must_have_features: ["cardiac_procedures", "cancer_treatment"]
+                    comparison_count: 5
+                  analysis_options:
+                    include_cost_comparison: true
+                    include_feature_gap_analysis: true
+                    include_provider_recommendations: true
+                    priority_weights:
+                      cost: 0.3
+                      coverage: 0.5
+                      provider_reputation: 0.1
+                      customer_service: 0.1
+      responses:
+        '202':
+          description: Analysis started successfully
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+              description: Request limit per hour
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              description: Remaining requests in current window
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisStartResponse'
+              examples:
+                success:
+                  value:
+                    session_id: "sess_1732276800_abc123def456"
+                    status: "processing"
+                    message: "Analysis started successfully"
+                    progress_url: "/api/v2/au/policies/progress/sess_1732276800_abc123def456"
+                    results_url: "/api/v2/au/policies/results/sess_1732276800_abc123def456"
+                    estimated_completion: "2025-11-22T10:03:00Z"
+                    country_config:
+                      code: "AU"
+                      name: "Australia"
+                      currency: "AUD"
+                      supported_providers: ["HCF", "MEDIBANK", "BUPA", "NIB", "AHSA"]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v2/{country}/policies/progress/{sessionId}:
+    get:
+      summary: Get Analysis Progress
+      description: |
+        Retrieves real-time progress information for an ongoing policy analysis.
+        Use this endpoint to poll for progress updates or implement progress bars.
+      operationId: getAnalysisProgress
+      tags:
+        - Policy Analysis
+      parameters:
+        - name: country
+          in: path
+          required: true
+          description: ISO 3166-1 alpha-2 country code
+          schema:
+            type: string
+            enum: [AU, SG, NZ]
+        - name: sessionId
+          in: path
+          required: true
+          description: Session ID returned from analysis request
+          schema:
+            type: string
+            pattern: '^sess_[0-9a-f]{8,64}$'
+            example: "sess_1732276800_abc123def456"
+      responses:
+        '200':
+          description: Progress information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2SessionProgress'
+              examples:
+                in_progress:
+                  value:
+                    session_id: "sess_1732276800_abc123def456"
+                    stage: "ai_analysis"
+                    progress: 45
+                    message: "Analyzing policy features with Gemini 1.5 Pro"
+                    stages:
+                      - name: "document_upload"
+                        status: "completed"
+                        started_at: "2025-11-22T10:01:00Z"
+                        completed_at: "2025-11-22T10:01:05Z"
+                      - name: "pii_protection"
+                        status: "completed"
+                        started_at: "2025-11-22T10:01:05Z"
+                        completed_at: "2025-11-22T10:01:15Z"
+                      - name: "ai_analysis"
+                        status: "in_progress"
+                        started_at: "2025-11-22T10:01:15Z"
+                      - name: "policy_comparison"
+                        status: "pending"
+                      - name: "recommendation_ranking"
+                        status: "pending"
+                    estimated_time_remaining: 75
+                completed:
+                  value:
+                    session_id: "sess_1732276800_abc123def456"
+                    stage: "completed"
+                    progress: 100
+                    message: "Analysis completed successfully"
+                    stages:
+                      - name: "document_upload"
+                        status: "completed"
+                        started_at: "2025-11-22T10:01:00Z"
+                        completed_at: "2025-11-22T10:01:05Z"
+                      - name: "pii_protection"
+                        status: "completed"
+                        started_at: "2025-11-22T10:01:05Z"
+                        completed_at: "2025-11-22T10:01:15Z"
+                      - name: "ai_analysis"
+                        status: "completed"
+                        started_at: "2025-11-22T10:01:15Z"
+                        completed_at: "2025-11-22T10:01:45Z"
+                      - name: "policy_comparison"
+                        status: "completed"
+                        started_at: "2025-11-22T10:01:45Z"
+                        completed_at: "2025-11-22T10:02:30Z"
+                      - name: "recommendation_ranking"
+                        status: "completed"
+                        started_at: "2025-11-22T10:02:30Z"
+                        completed_at: "2025-11-22T10:03:00Z"
+                    estimated_time_remaining: 0
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v2/{country}/policies/results/{sessionId}:
+    get:
+      summary: Get Analysis Results
+      description: |
+        Retrieves complete analysis results including policy comparison, recommendations, and cost analysis.
+        Results are available for 7 days after completion.
+      operationId: getAnalysisResults
+      tags:
+        - Policy Analysis
+      parameters:
+        - name: country
+          in: path
+          required: true
+          description: ISO 3166-1 alpha-2 country code
+          schema:
+            type: string
+            enum: [AU, SG, NZ]
+        - name: sessionId
+          in: path
+          required: true
+          description: Session ID from completed analysis
+          schema:
+            type: string
+            pattern: '^sess_[0-9a-f]{8,64}$'
+        - name: include_raw_data
+          in: query
+          required: false
+          description: Include raw analysis data in response
+          schema:
+            type: boolean
+            default: false
+        - name: format
+          in: query
+          required: false
+          description: Response format
+          schema:
+            type: string
+            enum: [json, pdf]
+            default: json
+      responses:
+        '200':
+          description: Analysis results retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V2AnalysisResponse'
+              examples:
+                complete_results:
+                  $ref: '#/components/examples/CompleteAnalysisResults'
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+              description: PDF report of analysis results
+        '202':
+          description: Analysis still in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingStatus'
+              examples:
+                still_processing:
+                  value:
+                    status: "processing"
+                    session_id: "sess_1732276800_abc123def456"
+                    message: "Analysis still in progress"
+                    progress: 75
+                    estimated_completion: "2025-11-22T10:04:30Z"
+                    progress_url: "/api/v2/au/policies/progress/sess_1732276800_abc123def456"
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+        '410':
+          $ref: '#/components/responses/ResultsExpired'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v2/{country}/policies/progress/{sessionId}/stream:
+    get:
+      summary: Real-time Progress Stream
+      description: |
+        Server-Sent Events endpoint for real-time progress updates.
+        Connect with EventSource to receive live progress notifications.
+      operationId: streamAnalysisProgress
+      tags:
+        - Policy Analysis
+      parameters:
+        - name: country
+          in: path
+          required: true
+          description: ISO 3166-1 alpha-2 country code
+          schema:
+            type: string
+            enum: [AU, SG, NZ]
+        - name: sessionId
+          in: path
+          required: true
+          description: Session ID for progress streaming
+          schema:
+            type: string
+            pattern: '^sess_[0-9a-f]{8,64}$'
+      responses:
+        '200':
+          description: SSE stream established
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-Sent Events stream with JSON progress data
+              examples:
+                progress_event:
+                  value: |
+                    data: {"session_id":"sess_1732276800_abc123def456","stage":"ai_analysis","progress":45,"message":"Analyzing policy features","estimated_time_remaining":75}
+                    
+                    data: {"session_id":"sess_1732276800_abc123def456","stage":"policy_comparison","progress":75,"message":"Comparing with provider policies","estimated_time_remaining":30}
+                    
+                    data: {"session_id":"sess_1732276800_abc123def456","stage":"completed","progress":100,"message":"Analysis completed successfully","estimated_time_remaining":0}
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+
+components:
+  schemas:
+    V2AnalysisRequest:
+      type: object
+      required:
+        - policy_text
+      properties:
+        policy_text:
+          type: string
+          minLength: 100
+          maxLength: 50000
+          description: Raw text content of the insurance policy document
+          example: "Hospital Insurance Policy\nProvider: HCF\nPremium: $250/month..."
+        user_preferences:
+          type: object
+          description: User preferences for analysis and recommendations
+          properties:
+            max_premium:
+              type: number
+              minimum: 0
+              maximum: 10000
+              description: Maximum acceptable monthly premium
+              example: 300
+            preferred_providers:
+              type: array
+              items:
+                type: string
+                enum: [HCF, MEDIBANK, BUPA, NIB, AHSA, AHM, TEACHERS_HEALTH]
+              maxItems: 10
+              description: List of preferred insurance providers
+              example: ["MEDIBANK", "BUPA"]
+            must_have_features:
+              type: array
+              items:
+                type: string
+              maxItems: 20
+              description: Required coverage features
+              example: ["emergency_surgery", "cardiac_procedures"]
+            comparison_count:
+              type: integer
+              minimum: 1
+              maximum: 10
+              default: 5
+              description: Number of policy recommendations to return
+              example: 3
+        analysis_options:
+          type: object
+          description: Options to customize the analysis process
+          properties:
+            include_cost_comparison:
+              type: boolean
+              default: true
+              description: Include detailed cost comparison analysis
+            include_feature_gap_analysis:
+              type: boolean
+              default: true
+              description: Include feature gap analysis
+            include_provider_recommendations:
+              type: boolean
+              default: true
+              description: Include provider-specific recommendations
+            priority_weights:
+              type: object
+              description: Weighting for different factors in recommendations
+              properties:
+                cost:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+                  description: Weight for cost considerations
+                  example: 0.4
+                coverage:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+                  description: Weight for coverage quality
+                  example: 0.4
+                provider_reputation:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+                  description: Weight for provider reputation
+                  example: 0.1
+                customer_service:
+                  type: number
+                  minimum: 0.0
+                  maximum: 1.0
+                  description: Weight for customer service quality
+                  example: 0.1
+
+    V2AnalysisResponse:
+      type: object
+      required:
+        - session_id
+        - country_code
+        - analysis_metadata
+        - user_policy
+        - recommendations
+        - summary
+      properties:
+        session_id:
+          type: string
+          pattern: '^sess_[0-9a-f]{8,64}$'
+          description: Unique session identifier
+          example: "sess_1732276800_abc123def456"
+        country_code:
+          type: string
+          enum: [AU, SG, NZ]
+          description: Country code for regulatory framework
+          example: "AU"
+        analysis_metadata:
+          type: object
+          required:
+            - analyzed_at
+            - confidence_score
+            - processing_time_ms
+            - ai_model_used
+          properties:
+            analyzed_at:
+              type: string
+              format: date-time
+              description: Timestamp when analysis was completed
+              example: "2025-11-22T10:03:00Z"
+            confidence_score:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+              description: Overall confidence in analysis results
+              example: 0.92
+            processing_time_ms:
+              type: integer
+              minimum: 0
+              description: Total processing time in milliseconds
+              example: 125000
+            ai_model_used:
+              type: string
+              description: AI model used for analysis
+              example: "gemini-1.5-pro"
+        user_policy:
+          $ref: '#/components/schemas/UserPolicy'
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyRecommendation'
+          minItems: 1
+          maxItems: 10
+          description: List of policy recommendations ranked by overall score
+        summary:
+          $ref: '#/components/schemas/AnalysisSummary'
+
+    UserPolicy:
+      type: object
+      required:
+        - detected_type
+        - detected_tier
+        - current_premium
+        - features
+        - excess_info
+        - provider_info
+      properties:
+        detected_type:
+          type: string
+          enum: [hospital, extras, combined]
+          description: Detected policy type
+          example: "hospital"
+        detected_tier:
+          type: string
+          enum: [basic, bronze, silver, gold]
+          description: Detected policy tier
+          example: "silver"
+        current_premium:
+          $ref: '#/components/schemas/PremiumInfo'
+        features:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/FeatureCategory'
+          description: Policy features organized by category
+        excess_info:
+          $ref: '#/components/schemas/ExcessInfo'
+        provider_info:
+          $ref: '#/components/schemas/ProviderInfo'
+
+    PolicyRecommendation:
+      type: object
+      required:
+        - provider
+        - policy
+        - comparison_scores
+        - feature_comparison
+        - cost_analysis
+        - switching_considerations
+      properties:
+        provider:
+          $ref: '#/components/schemas/ProviderDetails'
+        policy:
+          $ref: '#/components/schemas/PolicyDetails'
+        comparison_scores:
+          $ref: '#/components/schemas/ComparisonScores'
+        feature_comparison:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/FeatureComparison'
+          description: Feature-by-feature comparison with current policy
+        cost_analysis:
+          $ref: '#/components/schemas/CostAnalysis'
+        switching_considerations:
+          $ref: '#/components/schemas/SwitchingConsiderations'
+
+    V2SessionProgress:
+      type: object
+      required:
+        - session_id
+        - stage
+        - progress
+        - message
+        - stages
+      properties:
+        session_id:
+          type: string
+          pattern: '^sess_[0-9a-f]{8,64}$'
+          description: Session identifier
+          example: "sess_1732276800_abc123def456"
+        stage:
+          type: string
+          enum: [document_upload, pii_protection, ai_analysis, policy_comparison, recommendation_ranking, completed, error]
+          description: Current processing stage
+          example: "ai_analysis"
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Overall progress percentage
+          example: 45
+        message:
+          type: string
+          maxLength: 200
+          description: Human-readable progress message
+          example: "Analyzing policy features with Gemini 1.5 Pro"
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessingStage'
+          description: Detailed stage information
+        estimated_time_remaining:
+          type: integer
+          minimum: 0
+          description: Estimated seconds until completion
+          example: 75
+        error:
+          type: string
+          description: Error message if processing failed
+
+    ProcessingStage:
+      type: object
+      required:
+        - name
+        - status
+      properties:
+        name:
+          type: string
+          enum: [document_upload, pii_protection, ai_analysis, policy_comparison, recommendation_ranking]
+          description: Stage name
+          example: "ai_analysis"
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed]
+          description: Stage status
+          example: "in_progress"
+        started_at:
+          type: string
+          format: date-time
+          description: Stage start timestamp
+          example: "2025-11-22T10:01:15Z"
+        completed_at:
+          type: string
+          format: date-time
+          description: Stage completion timestamp
+          example: "2025-11-22T10:01:45Z"
+        error:
+          type: string
+          description: Error message if stage failed
+
+    AnalysisStartResponse:
+      type: object
+      required:
+        - session_id
+        - status
+        - message
+        - progress_url
+        - results_url
+        - estimated_completion
+        - country_config
+      properties:
+        session_id:
+          type: string
+          pattern: '^sess_[0-9a-f]{8,64}$'
+          description: Unique session identifier
+          example: "sess_1732276800_abc123def456"
+        status:
+          type: string
+          enum: [processing]
+          description: Analysis status
+          example: "processing"
+        message:
+          type: string
+          description: Success message
+          example: "Analysis started successfully"
+        progress_url:
+          type: string
+          format: uri
+          description: URL to check analysis progress
+          example: "/api/v2/au/policies/progress/sess_1732276800_abc123def456"
+        results_url:
+          type: string
+          format: uri
+          description: URL to retrieve results when complete
+          example: "/api/v2/au/policies/results/sess_1732276800_abc123def456"
+        estimated_completion:
+          type: string
+          format: date-time
+          description: Estimated completion time
+          example: "2025-11-22T10:03:00Z"
+        country_config:
+          type: object
+          required:
+            - code
+            - name
+            - currency
+            - supported_providers
+          properties:
+            code:
+              type: string
+              enum: [AU, SG, NZ]
+              description: Country code
+              example: "AU"
+            name:
+              type: string
+              description: Country name
+              example: "Australia"
+            currency:
+              type: string
+              enum: [AUD, SGD, NZD]
+              description: Country currency
+              example: "AUD"
+            supported_providers:
+              type: array
+              items:
+                type: string
+              description: List of supported insurance providers
+              example: ["HCF", "MEDIBANK", "BUPA", "NIB", "AHSA"]
+
+    PremiumInfo:
+      type: object
+      required:
+        - amount
+        - currency
+        - frequency
+        - family_type
+      properties:
+        amount:
+          type: number
+          minimum: 0
+          description: Premium amount
+          example: 250
+        currency:
+          type: string
+          enum: [AUD, SGD, NZD]
+          description: Currency code
+          example: "AUD"
+        frequency:
+          type: string
+          enum: [weekly, fortnightly, monthly, quarterly, annually]
+          description: Payment frequency
+          example: "monthly"
+        family_type:
+          type: string
+          enum: [single, couple, family, single_parent]
+          description: Policy family configuration
+          example: "single"
+
+    FeatureCategory:
+      type: object
+      required:
+        - included
+        - excluded
+        - limitations
+        - waiting_periods
+      properties:
+        included:
+          type: array
+          items:
+            type: string
+          description: Features included in this category
+          example: ["Emergency surgery", "Ambulance cover"]
+        excluded:
+          type: array
+          items:
+            type: string
+          description: Features excluded from this category
+          example: ["Cosmetic surgery"]
+        limitations:
+          type: array
+          items:
+            type: string
+          description: Coverage limitations
+          example: ["Requires specialist referral"]
+        waiting_periods:
+          type: object
+          additionalProperties:
+            type: string
+          description: Waiting periods for specific treatments
+          example:
+            emergency_surgery: "immediate"
+            cardiac_procedures: "6_months"
+
+    FeatureComparison:
+      type: object
+      required:
+        - current_coverage
+        - recommended_coverage
+        - improvements
+        - gaps
+      properties:
+        current_coverage:
+          type: array
+          items:
+            type: string
+          description: Features covered by current policy
+          example: ["Emergency surgery", "Ambulance cover"]
+        recommended_coverage:
+          type: array
+          items:
+            type: string
+          description: Features covered by recommended policy
+          example: ["Emergency surgery", "Ambulance cover", "Emergency dental"]
+        improvements:
+          type: array
+          items:
+            type: string
+          description: Additional features in recommended policy
+          example: ["Emergency dental coverage"]
+        gaps:
+          type: array
+          items:
+            type: string
+          description: Features lost in recommended policy
+          example: []
+
+    ComparisonScores:
+      type: object
+      required:
+        - overall_score
+        - cost_score
+        - coverage_score
+        - provider_score
+        - feature_match_score
+      properties:
+        overall_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Overall recommendation score
+          example: 88
+        cost_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Cost competitiveness score
+          example: 92
+        coverage_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Coverage quality score
+          example: 85
+        provider_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Provider reputation score
+          example: 82
+        feature_match_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Feature matching score
+          example: 90
+
+    CostAnalysis:
+      type: object
+      required:
+        - premium_difference
+        - excess_comparison
+        - total_cost_comparison
+      properties:
+        premium_difference:
+          type: object
+          required:
+            - amount
+            - percentage
+            - annual_savings
+          properties:
+            amount:
+              type: number
+              description: Monthly premium difference (negative = savings)
+              example: -15
+            percentage:
+              type: number
+              description: Percentage difference
+              example: -6.0
+            annual_savings:
+              type: number
+              description: Annual savings
+              example: 180
+        excess_comparison:
+          type: object
+          required:
+            - current_excess
+            - recommended_excess
+            - excess_difference
+          properties:
+            current_excess:
+              type: number
+              minimum: 0
+              description: Current policy excess
+              example: 500
+            recommended_excess:
+              type: number
+              minimum: 0
+              description: Recommended policy excess
+              example: 400
+            excess_difference:
+              type: number
+              description: Excess difference
+              example: -100
+        total_cost_comparison:
+          type: object
+          required:
+            - current_annual_cost
+            - recommended_annual_cost
+            - potential_savings
+          properties:
+            current_annual_cost:
+              type: number
+              minimum: 0
+              description: Current total annual cost
+              example: 3500
+            recommended_annual_cost:
+              type: number
+              minimum: 0
+              description: Recommended total annual cost
+              example: 3220
+            potential_savings:
+              type: number
+              description: Potential annual savings
+              example: 280
+
+    ExcessInfo:
+      type: object
+      required:
+        - hospital_excess
+      properties:
+        hospital_excess:
+          type: number
+          minimum: 0
+          description: Hospital excess amount
+          example: 500
+        extras_excess:
+          type: number
+          minimum: 0
+          description: Extras excess amount (if applicable)
+          example: 100
+        co_payments:
+          type: object
+          additionalProperties:
+            type: number
+          description: Co-payment amounts for specific services
+          example:
+            specialist_visit: 25
+            allied_health: 15
+
+    ProviderInfo:
+      type: object
+      required:
+        - current_provider
+        - policy_name
+      properties:
+        current_provider:
+          type: string
+          description: Current insurance provider code
+          example: "HCF"
+        policy_name:
+          type: string
+          description: Current policy name
+          example: "Basic Hospital Plus"
+        policy_number:
+          type: string
+          description: Policy number (may be anonymized for PII protection)
+          example: "[POLICY_NUMBER_1]"
+        start_date:
+          type: string
+          format: date
+          description: Policy start date
+          example: "2024-06-15"
+        renewal_date:
+          type: string
+          format: date
+          description: Policy renewal date
+          example: "2025-06-15"
+
+    ProviderDetails:
+      type: object
+      required:
+        - code
+        - name
+        - contact_info
+      properties:
+        code:
+          type: string
+          enum: [HCF, MEDIBANK, BUPA, NIB, AHSA, AHM, TEACHERS_HEALTH]
+          description: Provider code
+          example: "MEDIBANK"
+        name:
+          type: string
+          description: Provider full name
+          example: "Medibank Private"
+        contact_info:
+          type: object
+          required:
+            - phone
+            - website
+          properties:
+            phone:
+              type: string
+              description: Provider contact phone
+              example: "132 331"
+            website:
+              type: string
+              format: uri
+              description: Provider website
+              example: "https://www.medibank.com.au"
+
+    PolicyDetails:
+      type: object
+      required:
+        - name
+        - type
+        - tier
+        - premium
+      properties:
+        name:
+          type: string
+          description: Policy name
+          example: "Silver Hospital Plus"
+        type:
+          type: string
+          enum: [hospital, extras, combined]
+          description: Policy type
+          example: "hospital"
+        tier:
+          type: string
+          enum: [basic, bronze, silver, gold]
+          description: Policy tier
+          example: "silver"
+        premium:
+          $ref: '#/components/schemas/PremiumInfo'
+
+    SwitchingConsiderations:
+      type: object
+      required:
+        - waiting_periods_impact
+        - pre_existing_conditions
+        - current_benefits_to_lose
+        - recommended_timing
+      properties:
+        waiting_periods_impact:
+          type: array
+          items:
+            type: string
+          description: Impact of waiting periods when switching
+          example: ["12-month waiting period for orthopedics will restart"]
+        pre_existing_conditions:
+          type: array
+          items:
+            type: string
+          description: Pre-existing condition considerations
+          example: ["Existing conditions will be reassessed"]
+        current_benefits_to_lose:
+          type: array
+          items:
+            type: string
+          description: Benefits that will be lost when switching
+          example: ["HCF member rewards program"]
+        recommended_timing:
+          type: string
+          description: Recommended timing for the switch
+          example: "Consider switching at policy renewal to avoid overlap"
+
+    AnalysisSummary:
+      type: object
+      required:
+        - best_overall_recommendation
+        - potential_annual_savings
+        - key_improvements
+        - important_considerations
+        - next_steps
+      properties:
+        best_overall_recommendation:
+          type: integer
+          minimum: 0
+          description: Index of best recommendation in recommendations array
+          example: 0
+        potential_annual_savings:
+          type: number
+          description: Maximum potential annual savings
+          example: 280
+        key_improvements:
+          type: array
+          items:
+            type: string
+          description: Key improvements identified
+          example: ["Save $180 annually on premiums", "Lower excess by $100"]
+        important_considerations:
+          type: array
+          items:
+            type: string
+          description: Important factors to consider
+          example: ["Waiting periods will restart", "Pre-existing conditions reassessment required"]
+        next_steps:
+          type: array
+          items:
+            type: string
+          description: Recommended next actions
+          example: ["Contact Medibank for a detailed quote", "Review waiting period impacts"]
+
+    ProcessingStatus:
+      type: object
+      required:
+        - status
+        - session_id
+        - message
+        - progress
+        - progress_url
+      properties:
+        status:
+          type: string
+          enum: [processing]
+          description: Current status
+          example: "processing"
+        session_id:
+          type: string
+          pattern: '^sess_[0-9a-f]{8,64}$'
+          description: Session identifier
+          example: "sess_1732276800_abc123def456"
+        message:
+          type: string
+          description: Status message
+          example: "Analysis still in progress"
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Current progress percentage
+          example: 75
+        estimated_completion:
+          type: string
+          format: date-time
+          description: Estimated completion time
+          example: "2025-11-22T10:04:30Z"
+        progress_url:
+          type: string
+          format: uri
+          description: URL to check detailed progress
+          example: "/api/v2/au/policies/progress/sess_1732276800_abc123def456"
+
+    V2ErrorResponse:
+      type: object
+      required:
+        - error
+        - timestamp
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              example: "INVALID_POLICY_TEXT"
+            message:
+              type: string
+              description: Human-readable error message
+              example: "Policy text is required and must be at least 100 characters"
+            details:
+              type: string
+              description: Additional error context
+              example: "Provided text was only 45 characters long"
+            suggestion:
+              type: string
+              description: Recommended next action
+              example: "Please provide the complete policy document text"
+        session_id:
+          type: string
+          pattern: '^sess_[0-9a-f]{8,64}$'
+          description: Session ID if available
+          example: "sess_1732276800_abc123def456"
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+          example: "2025-11-22T10:01:00Z"
+        country_code:
+          type: string
+          enum: [AU, SG, NZ]
+          description: Country code if applicable
+          example: "AU"
+
+  examples:
+    CompleteAnalysisResults:
+      summary: Complete analysis results example
+      value:
+        session_id: "sess_1732276800_abc123def456"
+        country_code: "AU"
+        analysis_metadata:
+          analyzed_at: "2025-11-22T10:03:00Z"
+          confidence_score: 0.92
+          processing_time_ms: 125000
+          ai_model_used: "gemini-1.5-pro"
+        user_policy:
+          detected_type: "hospital"
+          detected_tier: "silver"
+          current_premium:
+            amount: 250
+            currency: "AUD"
+            frequency: "monthly"
+            family_type: "single"
+          features:
+            emergency:
+              included: ["Emergency surgery", "Ambulance cover"]
+              excluded: ["Dental emergencies"]
+              limitations: ["24-hour wait for accidents"]
+              waiting_periods:
+                emergency_surgery: "immediate"
+                ambulance: "immediate"
+            specialist:
+              included: ["Cardiology", "Orthopedics"]
+              excluded: ["Cosmetic surgery"]
+              limitations: ["Requires referral"]
+              waiting_periods:
+                cardiology: "6_months"
+                orthopedics: "12_months"
+          excess_info:
+            hospital_excess: 500
+            co_payments:
+              specialist_visit: 25
+          provider_info:
+            current_provider: "HCF"
+            policy_name: "Basic Hospital Plus"
+            start_date: "2024-06-15"
+            renewal_date: "2025-06-15"
+        recommendations:
+          - provider:
+              code: "MEDIBANK"
+              name: "Medibank Private"
+              contact_info:
+                phone: "132 331"
+                website: "https://www.medibank.com.au"
+            policy:
+              name: "Silver Hospital Plus"
+              type: "hospital"
+              tier: "silver"
+              premium:
+                amount: 235
+                currency: "AUD"
+                frequency: "monthly"
+                family_type: "single"
+            comparison_scores:
+              overall_score: 88
+              cost_score: 92
+              coverage_score: 85
+              provider_score: 82
+              feature_match_score: 90
+            feature_comparison:
+              emergency:
+                current_coverage: ["Emergency surgery", "Ambulance cover"]
+                recommended_coverage: ["Emergency surgery", "Ambulance cover", "Emergency dental"]
+                improvements: ["Emergency dental coverage"]
+                gaps: []
+              specialist:
+                current_coverage: ["Cardiology", "Orthopedics"]
+                recommended_coverage: ["Cardiology", "Orthopedics", "Neurology"]
+                improvements: ["Neurology coverage"]
+                gaps: []
+            cost_analysis:
+              premium_difference:
+                amount: -15
+                percentage: -6.0
+                annual_savings: 180
+              excess_comparison:
+                current_excess: 500
+                recommended_excess: 400
+                excess_difference: -100
+              total_cost_comparison:
+                current_annual_cost: 3500
+                recommended_annual_cost: 3220
+                potential_savings: 280
+            switching_considerations:
+              waiting_periods_impact: ["12-month waiting period for orthopedics will restart"]
+              pre_existing_conditions: ["Existing conditions will be reassessed"]
+              current_benefits_to_lose: ["HCF member rewards program"]
+              recommended_timing: "Consider switching at policy renewal to avoid overlap"
+        summary:
+          best_overall_recommendation: 0
+          potential_annual_savings: 280
+          key_improvements: ["Save $180 annually on premiums", "Lower excess by $100"]
+          important_considerations: ["Waiting periods will restart", "Pre-existing conditions reassessment required"]
+          next_steps: ["Contact Medibank for a detailed quote", "Review waiting period impacts"]
+
+  responses:
+    BadRequest:
+      description: Bad request - Invalid input data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V2ErrorResponse'
+          examples:
+            invalid_policy_text:
+              value:
+                error:
+                  code: "INVALID_POLICY_TEXT"
+                  message: "Policy text is required and must be at least 100 characters"
+                  details: "Provided text was only 45 characters long"
+                  suggestion: "Please provide the complete policy document text"
+                timestamp: "2025-11-22T10:01:00Z"
+                country_code: "AU"
+            invalid_country_code:
+              value:
+                error:
+                  code: "INVALID_COUNTRY_CODE"
+                  message: "Country code must be 2-letter ISO code"
+                  details: "Received 'AUS' but expected 'AU'"
+                  suggestion: "Use 2-letter country codes: AU, SG, NZ"
+                timestamp: "2025-11-22T10:01:00Z"
+
+    UnprocessableEntity:
+      description: Unprocessable entity - Business logic validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V2ErrorResponse'
+          examples:
+            unsupported_country:
+              value:
+                error:
+                  code: "UNSUPPORTED_COUNTRY"
+                  message: "Country 'US' is not supported"
+                  details: "Supported countries: AU, SG, NZ"
+                  suggestion: "Use one of the supported country codes"
+                timestamp: "2025-11-22T10:01:00Z"
+
+    TooManyRequests:
+      description: Too many requests - Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until next request allowed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V2ErrorResponse'
+          examples:
+            rate_limit_exceeded:
+              value:
+                error:
+                  code: "RATE_LIMIT_EXCEEDED"
+                  message: "Too many requests. Please try again in 60 seconds"
+                  details: "Limit: 10 requests per hour per IP"
+                  suggestion: "Wait for the rate limit to reset or upgrade to a higher tier"
+                timestamp: "2025-11-22T10:01:00Z"
+
+    SessionNotFound:
+      description: Session not found or expired
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V2ErrorResponse'
+          examples:
+            session_not_found:
+              value:
+                error:
+                  code: "SESSION_NOT_FOUND"
+                  message: "Session 'sess_invalid123' not found or expired"
+                  details: "Sessions expire after 7 days of inactivity"
+                  suggestion: "Check the session ID or start a new analysis"
+                timestamp: "2025-11-22T10:01:00Z"
+                country_code: "AU"
+
+    ResultsExpired:
+      description: Analysis results have expired and been purged
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V2ErrorResponse'
+          examples:
+            results_expired:
+              value:
+                error:
+                  code: "RESULTS_EXPIRED"
+                  message: "Analysis results have expired and been purged"
+                  details: "Results are available for 7 days after completion"
+                  suggestion: "Please run a new analysis"
+                timestamp: "2025-11-22T10:01:00Z"
+                country_code: "AU"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V2ErrorResponse'
+          examples:
+            ai_service_error:
+              value:
+                error:
+                  code: "AI_SERVICE_UNAVAILABLE"
+                  message: "AI analysis service is currently unavailable"
+                  details: "Gemini API is experiencing high load"
+                  suggestion: "Please try again in a few minutes"
+                timestamp: "2025-11-22T10:01:00Z"
+            pii_protection_error:
+              value:
+                error:
+                  code: "PII_PROTECTION_ERROR"
+                  message: "Privacy processing failed"
+                  details: "Unable to encrypt sensitive information"
+                  suggestion: "Please contact support if this error persists"
+                timestamp: "2025-11-22T10:01:00Z"
+
+  securitySchemes:
+    SessionAuth:
+      type: apiKey
+      in: header
+      name: X-Session-Token
+      description: Session-based authentication (current implementation)
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key authentication (coming soon)
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT authentication (future implementation)
+
+security:
+  - SessionAuth: []
+
+tags:
+  - name: Policy Analysis
+    description: Core policy analysis and comparison operations
+    externalDocs:
+      description: Find out more about policy analysis
+      url: https://docs.poco.ai/v2/policy-analysis
+
+externalDocs:
+  description: Complete API Documentation
+  url: https://docs.poco.ai/v2

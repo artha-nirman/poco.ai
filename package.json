@@ -10,8 +10,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest",
-    "test:watch": "jest --watch",
+    "test": "node test/run-tests.js",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "type-check": "tsc --noEmit",
     "init-db": "tsx lib/database/init-db.ts",
     "setup-db": "tsx lib/database/setup-db.ts",
@@ -39,6 +40,7 @@
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.83.0",
     "@tailwindcss/postcss": "^4.1.17",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.10.1",
     "@types/pg": "^8.15.6",
     "@types/react": "^19.2.6",
@@ -52,6 +54,7 @@
     "drizzle-orm": "^0.44.7",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.0.3",
+    "js-yaml": "^4.1.1",
     "lucide-react": "^0.554.0",
     "next": "^15.0.3",
     "pg": "^8.16.3",
@@ -65,10 +68,10 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
-    "@types/jest": "^30.0.0",
-    "jest": "^30.2.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "msw": "^2.12.2",
     "nodemon": "^3.1.11",
-    "ts-jest": "^29.4.5",
     "tsx": "^4.20.6"
   }
 }
