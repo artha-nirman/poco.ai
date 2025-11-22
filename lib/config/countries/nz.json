@@ -1,0 +1,69 @@
+{
+  "countryCode": "NZ",
+  "countryName": "New Zealand",
+  "currency": "NZD",
+  "regulatoryFramework": {
+    "frameworkName": "Health and Disability Services Act",
+    "mandatoryFeatures": ["acc_integration"],
+    "prohibitedFeatures": ["public_health_duplication"],
+    "standardWaitingPeriods": {
+      "pre_existing": "6 months",
+      "specialist_treatment": "3 months"
+    },
+    "excessRegulations": [
+      {
+        "maxAmount": {"amount": 500, "currency": "NZD"},
+        "applicationType": ["per_claim"],
+        "exemptions": ["acc_covered_services"]
+      }
+    ]
+  },
+  "policyTypes": [
+    {"typeId": "comprehensive", "displayName": "Comprehensive Health", "description": "Full private hospital and specialist coverage"},
+    {"typeId": "surgical", "displayName": "Surgical & Specialist", "description": "Surgery and specialist treatment coverage"},
+    {"typeId": "wellbeing", "displayName": "Wellbeing & Preventive", "description": "Preventive care and wellness services"}
+  ],
+  "tierSystems": [
+    {
+      "systemId": "coverage_level",
+      "tiers": [
+        {"tierId": "essential", "tierOrder": 1, "displayName": "Essential", "description": "Basic private hospital coverage"},
+        {"tierId": "comprehensive", "tierOrder": 2, "displayName": "Comprehensive", "description": "Full private hospital plus extras"},
+        {"tierId": "ultimate", "tierOrder": 3, "displayName": "Ultimate", "description": "Premium coverage with additional benefits"}
+      ]
+    }
+  ],
+  "coverageCategories": [
+    {
+      "categoryId": "private_hospital",
+      "displayName": "Private Hospital",
+      "features": {},
+      "categoryConstraints": []
+    },
+    {
+      "categoryId": "specialist_services",
+      "displayName": "Specialist Services",
+      "features": {},
+      "categoryConstraints": []
+    }
+  ],
+  "standardConstraints": [
+    {
+      "constraintType": "acc_coordination",
+      "defaultValue": {"accFirst": true, "privateSecondary": true},
+      "description": "ACC coordination for injury-related claims",
+      "regulatoryBasis": "Accident Compensation Act 2001"
+    }
+  ],
+  "localization": {
+    "language": "en-NZ",
+    "dateFormat": "DD/MM/YYYY",
+    "currencyFormat": "$1,500.00",
+    "terminology": {
+      "excess": "excess",
+      "premium": "premium",
+      "waiting_period": "waiting period",
+      "rebate": "benefit"
+    }
+  }
+}

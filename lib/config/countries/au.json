@@ -1,0 +1,73 @@
+{
+  "countryCode": "AU",
+  "countryName": "Australia",
+  "currency": "AUD",
+  "regulatoryFramework": {
+    "frameworkName": "Private Health Insurance Act 2007",
+    "mandatoryFeatures": ["private_hospital", "emergency_ambulance"],
+    "prohibitedFeatures": ["medicare_replacement"],
+    "standardWaitingPeriods": {
+      "hospital": "12 months",
+      "extras": "2 months",
+      "pre_existing": "12 months",
+      "obstetrics": "12 months",
+      "orthodontics": "24 months"
+    },
+    "excessRegulations": [
+      {
+        "maxAmount": {"amount": 750, "currency": "AUD"},
+        "applicationType": ["per_admission"],
+        "exemptions": ["emergency_services"]
+      }
+    ]
+  },
+  "policyTypes": [
+    {"typeId": "hospital", "displayName": "Hospital Only", "description": "Hospital coverage without extras"},
+    {"typeId": "extras", "displayName": "Extras Only", "description": "Ancillary services without hospital"},
+    {"typeId": "combined", "displayName": "Hospital & Extras", "description": "Comprehensive hospital and extras coverage"}
+  ],
+  "tierSystems": [
+    {
+      "systemId": "standard",
+      "tiers": [
+        {"tierId": "basic", "tierOrder": 1, "displayName": "Basic", "description": "Emergency and basic hospital coverage"},
+        {"tierId": "bronze", "tierOrder": 2, "displayName": "Bronze", "description": "Basic hospital plus some exclusions"},
+        {"tierId": "silver", "tierOrder": 3, "displayName": "Silver", "description": "Comprehensive hospital with extras"},
+        {"tierId": "gold", "tierOrder": 4, "displayName": "Gold", "description": "Top level hospital and extras coverage"}
+      ]
+    }
+  ],
+  "coverageCategories": [
+    {
+      "categoryId": "hospital",
+      "displayName": "Hospital Coverage",
+      "features": {},
+      "categoryConstraints": []
+    },
+    {
+      "categoryId": "extras",
+      "displayName": "Extras Coverage",
+      "features": {},
+      "categoryConstraints": []
+    }
+  ],
+  "standardConstraints": [
+    {
+      "constraintType": "waiting_period",
+      "defaultValue": {"duration": "12 months", "startTrigger": "coverage_start"},
+      "description": "Standard waiting period for hospital services",
+      "regulatoryBasis": "Private Health Insurance Act 2007"
+    }
+  ],
+  "localization": {
+    "language": "en-AU",
+    "dateFormat": "DD/MM/YYYY",
+    "currencyFormat": "$1,500.00",
+    "terminology": {
+      "excess": "excess",
+      "premium": "premium",
+      "waiting_period": "waiting period",
+      "rebate": "rebate"
+    }
+  }
+}

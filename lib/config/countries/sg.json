@@ -1,0 +1,69 @@
+{
+  "countryCode": "SG",
+  "countryName": "Singapore",
+  "currency": "SGD",
+  "regulatoryFramework": {
+    "frameworkName": "Medisave Act",
+    "mandatoryFeatures": ["medishield_life_integration"],
+    "prohibitedFeatures": ["government_hospital_replacement"],
+    "standardWaitingPeriods": {
+      "pre_existing": "12 months",
+      "maternity": "10 months"
+    },
+    "excessRegulations": [
+      {
+        "applicationType": ["per_admission"],
+        "exemptions": ["subsidized_ward"]
+      }
+    ]
+  },
+  "policyTypes": [
+    {"typeId": "integrated_shield", "displayName": "Integrated Shield Plan", "description": "Enhanced MediShield Life coverage"},
+    {"typeId": "supplement", "displayName": "Medical Supplement", "description": "Additional medical benefits"},
+    {"typeId": "riders", "displayName": "Rider Plans", "description": "Add-on coverage for specific needs"}
+  ],
+  "tierSystems": [
+    {
+      "systemId": "ward_class",
+      "tiers": [
+        {"tierId": "ward_c", "tierOrder": 1, "displayName": "Ward C", "description": "6-bedded ward coverage"},
+        {"tierId": "ward_b2", "tierOrder": 2, "displayName": "Ward B2", "description": "4-bedded ward coverage"},
+        {"tierId": "ward_b1", "tierOrder": 3, "displayName": "Ward B1", "description": "2-bedded ward coverage"},
+        {"tierId": "ward_a", "tierOrder": 4, "displayName": "Ward A", "description": "Single bed ward coverage"}
+      ]
+    }
+  ],
+  "coverageCategories": [
+    {
+      "categoryId": "inpatient",
+      "displayName": "Inpatient Benefits",
+      "features": {},
+      "categoryConstraints": []
+    },
+    {
+      "categoryId": "outpatient",
+      "displayName": "Outpatient Benefits",
+      "features": {},
+      "categoryConstraints": []
+    }
+  ],
+  "standardConstraints": [
+    {
+      "constraintType": "medisave_limit",
+      "defaultValue": {"monthlyLimit": {"amount": 500, "currency": "SGD"}},
+      "description": "Monthly Medisave claim limit",
+      "regulatoryBasis": "Medisave Act"
+    }
+  ],
+  "localization": {
+    "language": "en-SG",
+    "dateFormat": "DD/MM/YYYY",
+    "currencyFormat": "S$1,500.00",
+    "terminology": {
+      "excess": "co-payment",
+      "premium": "premium",
+      "waiting_period": "waiting period",
+      "rebate": "benefit"
+    }
+  }
+}
