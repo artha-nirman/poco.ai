@@ -12,10 +12,10 @@ export default async function AnalyzePage({ params }: Props) {
   try {
     const countryConfig = await loadCountryConfig(country)
     
-    // Define API endpoints for this country
-    const apiEndpoint = `/${country}/policies/analyze/api`
-    const progressEndpoint = `/${country}/policies/progress/[sessionId]`
-    const resultsEndpoint = `/${country}/policies/results/[sessionId]`
+    // Define V2 API endpoints for this country
+    const apiEndpoint = `/api/v2/${country}/policies/analyze`
+    const progressEndpoint = `/api/v2/${country}/policies/progress`
+    const resultsEndpoint = `/api/v2/${country}/policies/results`
 
     return (
       <div className="min-h-screen bg-gray-50">

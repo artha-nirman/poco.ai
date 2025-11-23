@@ -13,6 +13,8 @@
     "test": "node test/run-tests.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:workflow": "tsx scripts/test-full-workflow.ts",
+    "test:integration": "tsx scripts/test-complete-integration.ts",
     "type-check": "tsc --noEmit",
     "init-db": "tsx lib/database/init-db.ts",
     "setup-db": "tsx lib/database/setup-db.ts",
@@ -54,6 +56,8 @@
     "drizzle-orm": "^0.44.7",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.0.3",
+    "eventsource": "^4.1.0",
+    "form-data": "^4.0.5",
     "js-yaml": "^4.1.1",
     "lucide-react": "^0.554.0",
     "next": "^15.0.3",
@@ -70,7 +74,9 @@
     "@playwright/test": "^1.56.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/node-fetch": "^2.6.13",
     "msw": "^2.12.2",
+    "node-fetch": "^3.3.2",
     "nodemon": "^3.1.11",
     "tsx": "^4.20.6"
   }

@@ -56,36 +56,39 @@ export default function PolicyAnalyzer({
   };
 
   const startSSEConnection = (sessionId: string) => {
-    console.log(`🔗 Setting up V2 SSE for session: ${sessionId}`);
+    // Check if EventSource is supported
+    if (typeof EventSource === 'undefined') {
+      setError('Real-time updates not supported in this browser');
+      return;
+    }
     
-    // Use the progressEndpoint prop with proper sessionId replacement (V2 consistency)
-    const sseUrl = progressEndpoint.replace('[sessionId]', sessionId);
-    console.log(`📡 V2 SSE URL: ${sseUrl}`);
-    const eventSource = new EventSource(sseUrl);
+    // Build the correct SSE URL for V2 endpoint  
+    const sseUrl = `${progressEndpoint}/${sessionId}`;
+    
+    try {
+      // Create EventSource
+      const eventSource = new EventSource(sseUrl, {
+        withCredentials: false
+      });
 
-    eventSource.onopen = () => {
-      console.log('✅ V2 SSE connection opened');
-    };
+      eventSource.onopen = () => {
+        setError(null); // Clear any connection errors
+      };
 
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('📡 SSE message received:', data);
         
         switch (data.type) {
           case 'connected':
-            console.log('SSE connected for session:', data.sessionId);
+            setError(null);
             break;
             
           case 'progress':
-            console.log('Setting progress:', data.progress);
-            console.log('Progress data structure:', JSON.stringify(data.progress, null, 2));
             setProgress(data.progress);
             break;
             
           case 'results':
-            console.log('Analysis complete, setting results');
-            console.log('Results data structure:', JSON.stringify(data.results, null, 2));
             setResults(data.results);
             setProgress(null);
             setIsLoading(false);
@@ -93,37 +96,32 @@ export default function PolicyAnalyzer({
             break;
             
           case 'error':
-            console.error('SSE received error:', data.error);
             setError(data.error);
             setIsLoading(false);
             eventSource.close();
             break;
-            
-          default:
-            console.warn('Unknown SSE message type:', data.type);
         }
       } catch (err) {
-        console.error('Failed to parse SSE data:', err, 'Raw data:', event.data);
+        setError('Connection error - please try again');
+        setIsLoading(false);
+        eventSource.close();
       }
     };
 
     eventSource.onerror = (event) => {
-      console.error('SSE connection error:', event);
-      
-      if (eventSource.readyState === EventSource.CONNECTING) {
-        console.log('SSE reconnecting...');
-      } else if (eventSource.readyState === EventSource.CLOSED) {
-        console.log('SSE connection closed');
+      if (eventSource.readyState === EventSource.CLOSED) {
         setError('Connection lost - please refresh the page');
         setIsLoading(false);
       } else {
-        console.log('SSE connection failed');
         setError('Connection error - please try again');
         setIsLoading(false);
       }
-      
       eventSource.close();
     };
+    } catch (error) {
+      setError('Failed to establish real-time connection');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -167,7 +165,14 @@ export default function PolicyAnalyzer({
               style={{ width: `${progress.progress || progress.progress_percentage || 0}%` }}
             />
           </div>
-          <p className="text-sm text-gray-600 mt-2">{progress.stage || progress.current_stage || 'Processing...'}</p>
+          <p className="text-sm text-gray-600 mt-2">
+            {progress.stage || progress.current_stage || progress.message || 'Processing...'}
+          </p>
+          {progress.estimatedTimeRemaining > 0 && (
+            <p className="text-xs text-gray-500 mt-1">
+              Estimated time remaining: {Math.ceil(progress.estimatedTimeRemaining / 1000)}s
+            </p>
+          )}
         </div>
       )}
 
@@ -184,8 +189,8 @@ export default function PolicyAnalyzer({
             <div>
               <h3 className="font-semibold mb-3">Analysis Summary</h3>
               <p className="text-gray-700">
-                Analysis completed for {countryConfiguration.name}. 
-                {results.summary?.recommendation_count || 0} recommendations found.
+                Analysis completed for {countryConfiguration.countryName || countryConfiguration.name}. 
+                {results.recommendations?.length || 0} recommendations found.
               </p>
             </div>
 

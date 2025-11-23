@@ -9,7 +9,11 @@ import {
   StructuredDocumentData
 } from './interfaces';
 import { ServiceFactory } from './mock-services';
-import { createSessionStore, SessionStore } from '@/lib/database/session-store';
+import { ProviderPolicyService } from './provider-policy';
+import { createV2SessionStore } from '@/lib/database/v2-session-store';
+import type { V2SessionStore } from '@/lib/database/v2-session-store';
+import type { V2AnalysisRequest } from '@/lib/types/v2/api';
+import type { V2SessionProgress } from '@/lib/types/v2';
 import { 
   AnalysisResults, 
   ProgressState, 
@@ -19,8 +23,8 @@ import {
 } from '@/lib/types';
 import { PROCESSING_MESSAGES, PROCESSING_CONFIG } from '@/lib/constants';
 
-// Shared session store instance
-const sharedSessionStore = createSessionStore();
+// Shared V2 session store instance
+const sharedV2SessionStore = createV2SessionStore();
 
 export class CorePolicyProcessor implements PolicyProcessor {
   private static instance: CorePolicyProcessor;
@@ -28,16 +32,18 @@ export class CorePolicyProcessor implements PolicyProcessor {
   private llmProvider: LLMProvider;
   private piiProtection: PIIProtectionService;
   private storage: StorageService;
-  private sessionStore: SessionStore;
+  private sessionStore: V2SessionStore;
+  private providerPolicyService: ProviderPolicyService;
 
   constructor() {
-    // Use shared session store instance
-    this.sessionStore = sharedSessionStore;
+    // Use shared V2 session store instance
+    this.sessionStore = sharedV2SessionStore;
     // Use service factory to get appropriate implementations
     this.documentProcessor = ServiceFactory.createDocumentProcessor();
     this.llmProvider = ServiceFactory.createLLMProvider();
     this.piiProtection = ServiceFactory.createPIIProtectionService();
     this.storage = ServiceFactory.createStorageService();
+    this.providerPolicyService = new ProviderPolicyService();
   }
 
   static getInstance(): CorePolicyProcessor {
@@ -51,8 +57,21 @@ export class CorePolicyProcessor implements PolicyProcessor {
     const startTime = Date.now();
     
     try {
-      // Create session in database
-      await this.sessionStore.createSession(sessionId);
+      // Create session in database with default country and request
+      await this.sessionStore.createSession(sessionId, 'AU', { 
+        policy_text: '', // Will be populated after document processing
+        policy_type: 'health',
+        user_preferences: {
+          privacy_level: 'enhanced',
+          analysis_depth: 'comprehensive',
+          include_comparison: true,
+          highlight_concerns: true
+        },
+        request_metadata: {
+          timestamp: new Date().toISOString(),
+          session_id: sessionId
+        }
+      });
       
       let documentData: StructuredDocumentData;
       
@@ -125,8 +144,19 @@ export class CorePolicyProcessor implements PolicyProcessor {
         generatedAt: new Date()
       };
 
+      // Convert to V2 format for storage
+      const v2Results = {
+        session_id: sessionId,
+        analysis: results,
+        metadata: {
+          processing_time_ms: results.processingTimeMs,
+          completed_at: results.generatedAt.toISOString(),
+          confidence: results.confidence
+        }
+      };
+
       // Store results in database
-      await this.sessionStore.setResults(sessionId, results);
+      await this.sessionStore.setSessionResults(sessionId, v2Results);
       
       return results;
 
@@ -137,16 +167,52 @@ export class CorePolicyProcessor implements PolicyProcessor {
   }
 
   async getProgress(sessionId: string): Promise<ProgressState | null> {
-    return await this.sessionStore.getProgress(sessionId);
+    const v2Progress = await this.sessionStore.getSessionProgress(sessionId);
+    if (!v2Progress) return null;
+    
+    // Convert V2SessionProgress back to ProgressState for compatibility
+    return {
+      sessionId: v2Progress.session_id,
+      stage: v2Progress.current_stage || 'unknown',
+      progress: v2Progress.progress_percentage || 0,
+      message: v2Progress.stages?.[0]?.error || 'Processing...',
+      estimatedTimeRemaining: v2Progress.estimated_completion 
+        ? Math.max(0, Math.floor((new Date(v2Progress.estimated_completion).getTime() - Date.now()) / 1000))
+        : undefined,
+      error: v2Progress.error
+    };
   }
 
   async getResults(sessionId: string): Promise<AnalysisResults | null> {
-    return await this.sessionStore.getResults(sessionId);
+    const v2Results = await this.sessionStore.getSessionResults(sessionId);
+    if (!v2Results) return null;
+    
+    // Convert V2 format back to AnalysisResults for compatibility
+    if (v2Results.analysis) {
+      // New V2 format with wrapped analysis
+      return v2Results.analysis;
+    } else {
+      // Handle legacy direct format (if any exists)
+      return v2Results as any;
+    }
   }
 
   async createSession(sessionId: string, filename?: string): Promise<void> {
     console.log(`📝 Session ${sessionId} created${filename ? ` for file: ${filename}` : ''}`);
-    return await this.sessionStore.createSession(sessionId);
+    return await this.sessionStore.createSession(sessionId, 'AU', { 
+      policy_text: '', // Will be populated later
+      policy_type: 'health',
+      user_preferences: {
+        privacy_level: 'enhanced',
+        analysis_depth: 'comprehensive',
+        include_comparison: true,
+        highlight_concerns: true
+      },
+      request_metadata: {
+        timestamp: new Date().toISOString(),
+        session_id: sessionId
+      }
+    });
   }
 
   private async updateProgress(sessionId: string, progress: number, message: string): Promise<void> {
@@ -158,8 +224,25 @@ export class CorePolicyProcessor implements PolicyProcessor {
       estimatedTimeRemaining: this.estimateTimeRemaining(progress)
     };
 
+    // Convert ProgressState to V2SessionProgress format
+    const v2Progress = {
+      session_id: sessionId,
+      status: progress === 100 ? 'completed' as const : progress === -1 ? 'failed' as const : 'processing' as const,
+      progress_percentage: progress === -1 ? 0 : progress, // Don't use -1 for database constraint
+      current_stage: progressState.stage,
+      stages: [{
+        name: progressState.stage,
+        status: progress === 100 ? 'completed' as const : progress === -1 ? 'failed' as const : 'in_progress' as const,
+        started_at: new Date().toISOString(),
+        completed_at: progress === 100 ? new Date().toISOString() : undefined,
+        error: progress === -1 ? message : undefined
+      }],
+      estimated_completion: progressState.estimatedTimeRemaining ? new Date(Date.now() + progressState.estimatedTimeRemaining * 1000).toISOString() : null,
+      error: progress === -1 ? message : undefined
+    };
+
     // Store progress in database
-    await this.sessionStore.setProgress(sessionId, progressState);
+    await this.sessionStore.updateSessionProgress(sessionId, v2Progress);
 
     // TODO: Notify appropriate channels (web SSE, email, etc.)
     console.log(`[${sessionId}] ${progress}% - ${message}`);
@@ -286,86 +369,127 @@ export class CorePolicyProcessor implements PolicyProcessor {
   }
 
   private async getMockProviderPolicies(): Promise<ProviderPolicy[]> {
-    // TODO: Replace with real database query
-    return [
-      {
-        id: 'hcf_silver_plus',
-        providerCode: 'HCF',
-        providerName: 'HCF Health Insurance',
-        policyName: 'Silver Plus',
-        policyType: 'combined',
-        policyTier: 'silver',
+    try {
+      // Get active policies from database for Australia (default)
+      const activePolicies = await this.providerPolicyService.getActivePolicies('AU', {
+        qualityThreshold: 0.7 // Only get high-quality policies
+      });
+      
+      // Convert ProviderPolicyWithMetadata to ProviderPolicy format
+      return activePolicies.map(dbPolicy => ({
+        id: dbPolicy.id,
+        providerCode: dbPolicy.providerCode,
+        providerName: dbPolicy.providerName || dbPolicy.providerCode,
+        policyName: dbPolicy.policyName,
+        policyType: dbPolicy.policyType as 'hospital' | 'extras' | 'combined',
+        policyTier: dbPolicy.policyTier as 'basic' | 'bronze' | 'silver' | 'gold' || 'silver',
         premiumRange: {
-          single: { min: 300, max: 400 },
-          couple: { min: 600, max: 800 },
-          family: { min: 900, max: 1200 }
+          single: dbPolicy.features.premiumRanges.single,
+          couple: dbPolicy.features.premiumRanges.couple,
+          family: dbPolicy.features.premiumRanges.family
         },
         features: {
-          policyType: 'combined',
-          policyTier: 'silver', 
-          premiumCategory: '400-600',
-          excessCategory: 'under-500',
-          hospitalFeatures: ['private_hospital', 'choice_of_doctor', 'emergency_ambulance'],
-          extrasFeatures: ['general_dental', 'optical', 'physiotherapy'],
-          waitingPeriods: { hospital_services: '12 months', extras_services: '2 months' },
-          exclusions: ['cosmetic_surgery'],
-          conditions: ['excess_applies']
+          policyType: dbPolicy.policyType as 'hospital' | 'extras' | 'combined',
+          policyTier: dbPolicy.policyTier as 'basic' | 'bronze' | 'silver' | 'gold' || 'silver',
+          premiumCategory: this.calculatePremiumCategory(dbPolicy.features.premiumRanges.single.min),
+          excessCategory: 'under-500' as any, // Default, would come from constraints in real implementation
+          hospitalFeatures: this.extractHospitalFeatures(dbPolicy.features.coverageCategories),
+          extrasFeatures: this.extractExtrasFeatures(dbPolicy.features.coverageCategories),
+          waitingPeriods: this.extractWaitingPeriods(dbPolicy.features.constraints),
+          exclusions: this.extractExclusions(dbPolicy.features.constraints),
+          conditions: ['standard_terms']
         },
-        websiteUrl: 'https://www.hcf.com.au',
-        contactPhone: '1300 642 642'
-      },
-      {
-        id: 'medibank_silver',
-        providerCode: 'MEDIBANK',
-        providerName: 'Medibank',
-        policyName: 'Silver',
-        policyType: 'combined',
-        policyTier: 'silver',
-        premiumRange: {
-          single: { min: 280, max: 380 },
-          couple: { min: 560, max: 760 },
-          family: { min: 840, max: 1140 }
-        },
-        features: {
-          policyType: 'combined',
-          policyTier: 'silver',
-          premiumCategory: '200-400', 
-          excessCategory: '500-1000',
-          hospitalFeatures: ['private_hospital', 'day_surgery', 'emergency_ambulance'],
-          extrasFeatures: ['general_dental', 'major_dental', 'optical', 'physiotherapy'],
-          waitingPeriods: { hospital_services: '12 months', extras_services: '2 months' },
-          exclusions: ['experimental_treatments'],
-          conditions: ['annual_limits']
-        },
-        websiteUrl: 'https://www.medibank.com.au',
-        contactPhone: '1300 644 648'
-      },
-      {
-        id: 'bupa_silver_plus',
-        providerCode: 'BUPA',
-        providerName: 'Bupa Australia',
-        policyName: 'Silver Plus',
-        policyType: 'combined',
-        policyTier: 'silver',
-        premiumRange: {
-          single: { min: 320, max: 420 },
-          couple: { min: 640, max: 840 },
-          family: { min: 960, max: 1260 }
-        },
-        features: {
+        websiteUrl: dbPolicy.providerName ? `https://www.${dbPolicy.providerCode.toLowerCase()}.com.au` : undefined,
+        contactPhone: this.getProviderContactPhone(dbPolicy.providerCode)
+      }));
+    } catch (error) {
+      console.error('Failed to load provider policies from database:', error);
+      
+      // Fallback to hardcoded data if database is unavailable
+      return [
+        {
+          id: 'fallback_policy_1',
+          providerCode: 'MEDIBANK',
+          providerName: 'Medibank Private',
+          policyName: 'Silver Extra',
           policyType: 'combined',
           policyTier: 'silver',
-          premiumCategory: '400-600',
-          excessCategory: 'under-500',
-          hospitalFeatures: ['private_hospital', 'choice_of_doctor', 'accommodation', 'emergency_ambulance'],
-          extrasFeatures: ['general_dental', 'major_dental', 'optical', 'physiotherapy', 'psychology'],
-          waitingPeriods: { hospital_services: '12 months', extras_services: '2 months' },
-          exclusions: ['cosmetic_surgery', 'experimental_treatments'],
-          conditions: ['excess_applies', 'session_limits']
-        },
-        websiteUrl: 'https://www.bupa.com.au',
-        contactPhone: '1300 888 299'
-      }
-    ];
+          premiumRange: {
+            single: { min: 300, max: 400 },
+            couple: { min: 600, max: 800 },
+            family: { min: 900, max: 1200 }
+          },
+          features: {
+            policyType: 'combined',
+            policyTier: 'silver',
+            premiumCategory: '400-600',
+            excessCategory: 'under-500',
+            hospitalFeatures: ['private_hospital', 'choice_of_doctor', 'emergency_ambulance'],
+            extrasFeatures: ['general_dental', 'optical', 'physiotherapy'],
+            waitingPeriods: { hospital_services: '12 months', extras_services: '2 months' },
+            exclusions: ['cosmetic_surgery'],
+            conditions: ['standard_terms']
+          },
+          websiteUrl: 'https://www.medibank.com.au',
+          contactPhone: '1300 305 085'
+        }
+      ];
+    }
+  }
+
+  // Helper methods for mapping database data to legacy format
+  private calculatePremiumCategory(singlePremium: number): 'under-200' | '200-400' | '400-600' | 'over-600' {
+    if (singlePremium < 200) return 'under-200';
+    if (singlePremium < 400) return '200-400';
+    if (singlePremium < 600) return '400-600';
+    return 'over-600';
+  }
+
+  private extractHospitalFeatures(coverageCategories: any): string[] {
+    const hospitalCategory = coverageCategories?.hospital;
+    if (!hospitalCategory?.features) return ['private_hospital', 'emergency_ambulance'];
+    
+    return Object.keys(hospitalCategory.features).filter(feature => 
+      hospitalCategory.features[feature]?.covered === true
+    );
+  }
+
+  private extractExtrasFeatures(coverageCategories: any): string[] {
+    const extrasCategory = coverageCategories?.extras;
+    if (!extrasCategory?.features) return ['general_dental', 'optical'];
+    
+    return Object.keys(extrasCategory.features).filter(feature => 
+      extrasCategory.features[feature]?.covered === true
+    );
+  }
+
+  private extractWaitingPeriods(constraints: any[]): Record<string, string> {
+    const waitingPeriodConstraints = constraints?.filter(c => c.constraintType === 'waiting_period') || [];
+    const periods: Record<string, string> = {};
+    
+    waitingPeriodConstraints.forEach(constraint => {
+      constraint.appliesTo?.forEach((category: string) => {
+        periods[category] = constraint.value?.duration || '12 months';
+      });
+    });
+    
+    return periods.hospital_services || periods.extras_services 
+      ? periods 
+      : { hospital_services: '12 months', extras_services: '2 months' };
+  }
+
+  private extractExclusions(constraints: any[]): string[] {
+    const exclusionConstraints = constraints?.filter(c => c.constraintType === 'exclusion') || [];
+    return exclusionConstraints.flatMap(c => c.appliesTo || []);
+  }
+
+  private getProviderContactPhone(providerCode: string): string {
+    const contacts: Record<string, string> = {
+      'MEDIBANK': '1300 305 085',
+      'BUPA': '1300 363 892',
+      'HCF': '1300 642 642',
+      'NIB': '1300 642 642'
+    };
+    return contacts[providerCode.toUpperCase()] || '1300 000 000';
   }
 }

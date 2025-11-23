@@ -7,7 +7,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { CorePolicyProcessor } from '@/lib/services/policy-processor'
-import { createSessionStore } from '@/lib/database/session-store'
 import { PROCESSING_CONFIG } from '@/lib/constants'
 import { loadCountryConfig } from '@/lib/config/country-loader'
 
@@ -67,14 +66,14 @@ export async function POST(
 
       // Create session and start processing
       const fileContent = await file.arrayBuffer()
-      await processor.createSession(sessionId, file.name)
       
-      // Start processing in background
+      // Start processing in background (this will create the session)
+      const skipDocumentAI = file.type === 'text/plain';
       processor.processPolicy(
         sessionId,
         Buffer.from(fileContent),
         file.name,
-        false // Don't skip Document AI for PDFs
+        skipDocumentAI // Skip Document AI for text files, use it for PDFs/images
       ).catch((error) => {
         console.error(`V2 processing failed for session ${sessionId}:`, error)
       })
@@ -91,9 +90,8 @@ export async function POST(
       }
 
       // Create session and start processing for text input
-      await processor.createSession(sessionId, 'text_input.txt')
       
-      // Start processing in background
+      // Start processing in background (this will create the session)
       processor.processPolicy(
         sessionId,
         Buffer.from(policyText, 'utf-8'),
